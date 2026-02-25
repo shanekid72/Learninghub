@@ -1,9 +1,7 @@
 import { Resend } from 'resend'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { WelcomeEmail } from './email-templates/welcome'
-import { CompletionEmail } from './email-templates/completion'
-import { ReminderEmail } from './email-templates/reminder'
-import { createElement } from 'react'
+import { buildWelcomeEmail } from './email-templates/welcome'
+import { buildCompletionEmail } from './email-templates/completion'
+import { buildReminderEmail } from './email-templates/reminder'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -25,49 +23,41 @@ export async function sendEmail({ to, type, data }: SendEmailParams) {
     switch (type) {
       case 'welcome':
         subject = 'Welcome to Learning Hub!'
-        html = renderToStaticMarkup(
-          createElement(WelcomeEmail, {
-            userName: data.userName as string,
-            loginUrl: data.loginUrl as string,
-          })
-        )
+        html = buildWelcomeEmail({
+          userName: data.userName as string,
+          loginUrl: data.loginUrl as string,
+        })
         break
 
       case 'completion':
         subject = `Congratulations! You've completed "${data.moduleTitle}"`
-        html = renderToStaticMarkup(
-          createElement(CompletionEmail, {
-            userName: data.userName as string,
-            moduleTitle: data.moduleTitle as string,
-            completionDate: data.completionDate as string,
-            certificateUrl: data.certificateUrl as string | undefined,
-            hubUrl: data.hubUrl as string,
-          })
-        )
+        html = buildCompletionEmail({
+          userName: data.userName as string,
+          moduleTitle: data.moduleTitle as string,
+          completionDate: data.completionDate as string,
+          certificateUrl: data.certificateUrl as string | undefined,
+          hubUrl: data.hubUrl as string,
+        })
         break
 
       case 'reminder':
         subject = 'Continue Your Learning Journey'
-        html = renderToStaticMarkup(
-          createElement(ReminderEmail, {
-            userName: data.userName as string,
-            modulesInProgress: data.modulesInProgress as Array<{ title: string; progress: number }>,
-            hubUrl: data.hubUrl as string,
-          })
-        )
+        html = buildReminderEmail({
+          userName: data.userName as string,
+          modulesInProgress: data.modulesInProgress as Array<{ title: string; progress: number }>,
+          hubUrl: data.hubUrl as string,
+        })
         break
 
       case 'certificate':
         subject = 'Your Certificate is Ready!'
-        html = renderToStaticMarkup(
-          createElement(CompletionEmail, {
-            userName: data.userName as string,
-            moduleTitle: data.moduleTitle as string,
-            completionDate: data.completionDate as string,
-            certificateUrl: data.certificateUrl as string,
-            hubUrl: data.hubUrl as string,
-          })
-        )
+        html = buildCompletionEmail({
+          userName: data.userName as string,
+          moduleTitle: data.moduleTitle as string,
+          completionDate: data.completionDate as string,
+          certificateUrl: data.certificateUrl as string,
+          hubUrl: data.hubUrl as string,
+        })
         break
 
       default:

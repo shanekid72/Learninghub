@@ -1,3 +1,3 @@
-export { WelcomeEmail } from './welcome'
-export { CompletionEmail } from './completion'
-export { ReminderEmail } from './reminder'
+export { buildWelcomeEmail } from './welcome'
+export { buildCompletionEmail } from './completion'
+export { buildReminderEmail } from './reminder'
