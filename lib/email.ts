@@ -3,7 +3,18 @@ import { buildWelcomeEmail } from './email-templates/welcome'
 import { buildCompletionEmail } from './email-templates/completion'
 import { buildReminderEmail } from './email-templates/reminder'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+let resendClient: Resend | null = null
+
+function getResendClient(): Resend {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable is not set')
+    }
+    resendClient = new Resend(apiKey)
+  }
+  return resendClient
+}
 
 const FROM_EMAIL = 'Learning Hub <noreply@learninghub.com>'
 
@@ -64,7 +75,7 @@ export async function sendEmail({ to, type, data }: SendEmailParams) {
         throw new Error(`Unknown email type: ${type}`)
     }
 
-    const result = await resend.emails.send({
+    const result = await getResendClient().emails.send({
       from: FROM_EMAIL,
       to,
       subject,
