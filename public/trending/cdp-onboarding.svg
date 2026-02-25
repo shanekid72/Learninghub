@@ -1,0 +1,22 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1F2134"/>
+      <stop offset="1" stop-color="#101321"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="126" y1="96" x2="514" y2="264" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4B6EA2"/>
+      <stop offset="1" stop-color="#2C3E62"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <text x="60" y="72" fill="#EFF3FF" font-family="Arial, sans-serif" font-size="34" font-weight="700">CDP Onboarding</text>
+  <rect x="126" y="96" width="388" height="168" rx="16" fill="url(#panel)" stroke="#89A8D9" stroke-opacity="0.5"/>
+  <circle cx="188" cy="154" r="26" fill="#D7E5FF" fill-opacity="0.9"/>
+  <rect x="160" y="188" width="56" height="34" rx="10" fill="#D7E5FF" fill-opacity="0.8"/>
+  <rect x="250" y="130" width="216" height="12" rx="6" fill="#D7E5FF" fill-opacity="0.55"/>
+  <rect x="250" y="156" width="166" height="10" rx="5" fill="#D7E5FF" fill-opacity="0.32"/>
+  <rect x="250" y="184" width="128" height="10" rx="5" fill="#D7E5FF" fill-opacity="0.32"/>
+  <circle cx="452" cy="222" r="24" fill="#4ADE80"/>
+  <path d="M441 222L449 230L464 214" stroke="#08391D" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

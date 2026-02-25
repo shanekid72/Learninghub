@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/lh/completions": {},
+    "/api/lh/mark-complete": {},
+    "/api/lh/modules": {}
+  }
+}

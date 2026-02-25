@@ -1,0 +1,21 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10252B"/>
+      <stop offset="1" stop-color="#091318"/>
+    </linearGradient>
+    <linearGradient id="globe" x1="210" y1="96" x2="430" y2="292" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#58D7F8"/>
+      <stop offset="1" stop-color="#1E7A9D"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <text x="60" y="72" fill="#E9FCFF" font-family="Arial, sans-serif" font-size="30" font-weight="700">worldAPI Authentication</text>
+  <circle cx="300" cy="192" r="98" stroke="url(#globe)" stroke-width="14"/>
+  <path d="M210 192H390" stroke="#9EEAFB" stroke-width="7" stroke-linecap="round"/>
+  <path d="M300 94V290" stroke="#9EEAFB" stroke-width="7" stroke-linecap="round"/>
+  <path d="M240 122C270 160 270 224 240 262" stroke="#9EEAFB" stroke-width="5" stroke-linecap="round"/>
+  <path d="M360 122C330 160 330 224 360 262" stroke="#9EEAFB" stroke-width="5" stroke-linecap="round"/>
+  <path d="M442 136L492 158V206C492 240 470 269 442 280C414 269 392 240 392 206V158L442 136Z" fill="#2D7C9B"/>
+  <path d="M427 208L438 219L460 196" stroke="#D9F7FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,26 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#11242A"/>
+      <stop offset="1" stop-color="#0B1418"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="130" y1="250" x2="520" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4ACD9C"/>
+      <stop offset="1" stop-color="#6BE5D4"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <circle cx="138" cy="248" r="28" fill="#1E8D74"/>
+  <circle cx="320" cy="188" r="28" fill="#1F9F82"/>
+  <circle cx="506" cy="132" r="28" fill="#2AB998"/>
+  <path d="M138 248C190 226 260 206 320 188C378 170 450 150 506 132" stroke="url(#flow)" stroke-width="10" stroke-linecap="round"/>
+  <g opacity="0.9">
+    <circle cx="138" cy="248" r="18" fill="#B8FFE9"/>
+    <circle cx="320" cy="188" r="18" fill="#B8FFE9"/>
+    <circle cx="506" cy="132" r="18" fill="#B8FFE9"/>
+    <text x="132" y="254" fill="#0C2A21" font-family="Arial, sans-serif" font-size="18" font-weight="700">$</text>
+    <text x="314" y="194" fill="#0C2A21" font-family="Arial, sans-serif" font-size="18" font-weight="700">$</text>
+    <text x="500" y="138" fill="#0C2A21" font-family="Arial, sans-serif" font-size="18" font-weight="700">$</text>
+  </g>
+  <text x="60" y="72" fill="#E9FFF8" font-family="Arial, sans-serif" font-size="34" font-weight="700">Journey of Your Money</text>
+</svg>

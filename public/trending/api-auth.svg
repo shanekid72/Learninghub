@@ -1,0 +1,22 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2A181B"/>
+      <stop offset="1" stop-color="#120A0B"/>
+    </linearGradient>
+    <linearGradient id="lock" x1="284" y1="130" x2="356" y2="246" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF866F"/>
+      <stop offset="1" stop-color="#D4452A"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <text x="60" y="72" fill="#FFE8E4" font-family="Arial, sans-serif" font-size="34" font-weight="700">API Auth</text>
+  <text x="120" y="238" fill="#FF9A86" font-family="Courier New, monospace" font-size="86" font-weight="700">&lt;/&gt;</text>
+  <rect x="284" y="154" width="72" height="92" rx="12" fill="url(#lock)"/>
+  <path d="M300 154V138C300 118 316 102 336 102C356 102 372 118 372 138V154" stroke="#FFB5A7" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="320" cy="196" r="9" fill="#471812"/>
+  <rect x="317" y="205" width="6" height="20" rx="3" fill="#471812"/>
+  <path d="M430 112H520" stroke="#8A3A2D" stroke-width="8" stroke-linecap="round"/>
+  <path d="M430 146H552" stroke="#8A3A2D" stroke-width="8" stroke-linecap="round"/>
+  <path d="M430 180H500" stroke="#8A3A2D" stroke-width="8" stroke-linecap="round"/>
+</svg>

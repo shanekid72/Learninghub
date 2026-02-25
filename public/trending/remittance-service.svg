@@ -1,0 +1,23 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#13243F"/>
+      <stop offset="1" stop-color="#0B1322"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="220" y1="90" x2="420" y2="290" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5BA6FF"/>
+      <stop offset="1" stop-color="#2C68B8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <circle cx="320" cy="190" r="102" stroke="url(#ring)" stroke-width="18"/>
+  <path d="M230 188H410" stroke="#8EC4FF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M319 98V278" stroke="#8EC4FF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M252 130C286 160 354 220 388 250" stroke="#8EC4FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M388 130C354 160 286 220 252 250" stroke="#8EC4FF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M130 110L190 150" stroke="#79B6FF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M130 110L130 170L190 170" stroke="#79B6FF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M510 272L450 232" stroke="#79B6FF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M510 272L510 212L450 212" stroke="#79B6FF" stroke-width="10" stroke-linecap="round"/>
+  <text x="60" y="72" fill="#E9F3FF" font-family="Arial, sans-serif" font-size="34" font-weight="700">Remittance as a Service</text>
+</svg>

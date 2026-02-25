@@ -1,0 +1,11 @@
+{
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/lh/mark-complete/route": "app/api/lh/mark-complete/route.js",
+  "/api/lh/completions/route": "app/api/lh/completions/route.js",
+  "/api/lh/modules/route": "app/api/lh/modules/route.js",
+  "/hub/page": "app/hub/page.js",
+  "/page": "app/page.js"
+}
