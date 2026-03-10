@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { getSessionContext } from "@/lib/app-session";
 
-export async function GET(req: NextRequest) {
-  const cookieName = process.env.AUTH_COOKIE_NAME || "lh_session";
-  const value = req.cookies.get(cookieName)?.value;
+export async function GET() {
+  const session = await getSessionContext();
 
-  if (!value) {
+  if (!session) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const email = decodeURIComponent(value).trim().toLowerCase();
-  return NextResponse.json({ ok: true, email });
+  return NextResponse.json({
+    ok: true,
+    email: session.email,
+    user: session.profile,
+  });
 }

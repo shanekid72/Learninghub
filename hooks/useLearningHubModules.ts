@@ -15,6 +15,10 @@ export interface LHModule {
     badges: string
     teams: string
     sort_order: number
+    assigned?: boolean
+    due_date?: string | null
+    last_updated?: string | null
+    owner?: string | null
 }
 
 export function useLearningHubModules() {

@@ -6,6 +6,8 @@
 # next.js
 /.next/
 /out/
+/.next_stale_*/
+.next-dev.log
 
 # production
 /build
@@ -25,3 +27,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# test artifacts
+/test-results/
+/playwright-report/

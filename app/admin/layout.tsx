@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionContext, hasAdminRole } from "@/lib/app-session"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 
 export default async function AdminLayout({
@@ -7,21 +7,13 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
+  const session = await getSessionContext()
+
+  if (!session) {
     redirect("/")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (profile?.role !== "admin") {
+  if (!hasAdminRole(session.profile)) {
     redirect("/hub")
   }
 

@@ -6,205 +6,328 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
-      profiles: {
+      analytics_events: {
         Row: {
-          id: string
-          email: string
-          full_name: string | null
-          avatar_url: string | null
-          role: string
-          team: string | null
           created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          module_id: string | null
+          user_id: string | null
         }
         Insert: {
-          id: string
-          email: string
-          full_name?: string | null
-          avatar_url?: string | null
-          role?: string
-          team?: string | null
           created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          module_id?: string | null
+          user_id?: string | null
         }
         Update: {
-          id?: string
-          email?: string
-          full_name?: string | null
-          avatar_url?: string | null
-          role?: string
-          team?: string | null
           created_at?: string
-        }
-      }
-      quizzes: {
-        Row: {
-          id: string
-          module_id: string
-          title: string
-          questions: Json
-          passing_score: number
-          created_at: string
-        }
-        Insert: {
+          event_type?: string
           id?: string
-          module_id: string
-          title: string
-          questions: Json
-          passing_score?: number
-          created_at?: string
+          metadata?: Json | null
+          module_id?: string | null
+          user_id?: string | null
         }
-        Update: {
-          id?: string
-          module_id?: string
-          title?: string
-          questions?: Json
-          passing_score?: number
-          created_at?: string
-        }
-      }
-      quiz_attempts: {
-        Row: {
-          id: string
-          user_id: string
-          quiz_id: string
-          answers: Json
-          score: number
-          passed: boolean
-          completed_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          quiz_id: string
-          answers: Json
-          score: number
-          passed: boolean
-          completed_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          quiz_id?: string
-          answers?: Json
-          score?: number
-          passed?: boolean
-          completed_at?: string
-        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       certificates: {
         Row: {
-          id: string
-          user_id: string
-          module_id: string
           certificate_url: string | null
+          id: string
           issued_at: string
+          module_id: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          module_id: string
           certificate_url?: string | null
+          id?: string
           issued_at?: string
+          module_id: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          module_id?: string
           certificate_url?: string | null
+          id?: string
           issued_at?: string
+          module_id?: string
+          user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "certificates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       comments: {
         Row: {
-          id: string
-          user_id: string
-          module_id: string
           content: string
+          created_at: string
+          id: string
+          module_id: string
           parent_id: string | null
-          created_at: string
           updated_at: string
-        }
-        Insert: {
-          id?: string
           user_id: string
-          module_id: string
-          content: string
-          parent_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          module_id?: string
-          content?: string
-          parent_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      analytics_events: {
-        Row: {
-          id: string
-          user_id: string | null
-          event_type: string
-          module_id: string | null
-          metadata: Json | null
-          created_at: string
         }
         Insert: {
-          id?: string
-          user_id?: string | null
-          event_type: string
-          module_id?: string | null
-          metadata?: Json | null
+          content: string
           created_at?: string
+          id?: string
+          module_id: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string | null
-          event_type?: string
-          module_id?: string | null
-          metadata?: Json | null
+          content?: string
           created_at?: string
+          id?: string
+          module_id?: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          id: string
+          is_active: boolean
+          module_id: string
+          module_source: string
+          team: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          is_active?: boolean
+          module_id: string
+          module_source?: string
+          team?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          is_active?: boolean
+          module_id?: string
+          module_source?: string
+          team?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_assignments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_preferences: {
         Row: {
-          id: string
-          user_id: string
-          email_welcome: boolean
-          email_completion: boolean
+          created_at: string
           email_certificate: boolean
+          email_completion: boolean
           email_digest: boolean
           email_reminders: boolean
-          created_at: string
+          email_welcome: boolean
+          id: string
           updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          email_welcome?: boolean
-          email_completion?: boolean
+          created_at?: string
           email_certificate?: boolean
+          email_completion?: boolean
           email_digest?: boolean
           email_reminders?: boolean
-          created_at?: string
+          email_welcome?: boolean
+          id?: string
           updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          email_welcome?: boolean
-          email_completion?: boolean
+          created_at?: string
           email_certificate?: boolean
+          email_completion?: boolean
           email_digest?: boolean
           email_reminders?: boolean
-          created_at?: string
+          email_welcome?: boolean
+          id?: string
           updated_at?: string
+          user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          role: string
+          team: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          role?: string
+          team?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          role?: string
+          team?: string | null
+        }
+        Relationships: []
+      }
+      quiz_attempts: {
+        Row: {
+          answers: Json
+          completed_at: string
+          id: string
+          passed: boolean
+          quiz_id: string
+          score: number
+          user_id: string
+        }
+        Insert: {
+          answers: Json
+          completed_at?: string
+          id?: string
+          passed: boolean
+          quiz_id: string
+          score: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          completed_at?: string
+          id?: string
+          passed?: boolean
+          quiz_id?: string
+          score?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_attempts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          module_id: string
+          passing_score: number
+          questions: Json
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          module_id: string
+          passing_score?: number
+          questions: Json
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          module_id?: string
+          passing_score?: number
+          questions?: Json
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -214,6 +337,9 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }

@@ -1,6 +1,6 @@
 "use client"
 
-import { QuizQuestion } from "@/lib/quiz-types"
+import { QuizQuestionBase } from "@/lib/quiz-types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { CheckCircle2, XCircle } from "lucide-react"
 
 interface QuestionCardProps {
-  question: QuizQuestion
+  question: QuizQuestionBase
   selectedAnswers: string[]
   onAnswer: (selected: string[]) => void
   showCorrect?: boolean

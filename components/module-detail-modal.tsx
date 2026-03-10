@@ -20,8 +20,10 @@ import { Button } from "@/components/ui/button"
 import { EmbedFrame } from "./embed-frame"
 import { QuizContainer } from "./quiz"
 import { CommentSection } from "./comments"
+import { CertificateDownload } from "./certificate/certificate-download"
 import type { Module } from "@/lib/learning-data"
 import type { Quiz, QuizResult } from "@/lib/quiz-types"
+import { trackModuleView, trackQuizComplete, trackQuizStart } from "@/lib/analytics"
 
 type TabType = "content" | "quiz" | "comments"
 
@@ -42,6 +44,7 @@ export function ModuleDetailModal({
   const [supabaseQuiz, setSupabaseQuiz] = React.useState<Quiz | null>(null)
   const [quizLoading, setQuizLoading] = React.useState(false)
   const [quizPassed, setQuizPassed] = React.useState(false)
+  const [quizStartTracked, setQuizStartTracked] = React.useState(false)
 
   React.useEffect(() => {
     if (isOpen) {
@@ -49,6 +52,7 @@ export function ModuleDetailModal({
       setActiveTab("content")
       setSupabaseQuiz(null)
       setQuizPassed(false)
+      setQuizStartTracked(false)
     } else {
       document.body.style.overflow = ""
     }
@@ -60,8 +64,19 @@ export function ModuleDetailModal({
   React.useEffect(() => {
     if (isOpen && module) {
       fetchSupabaseQuiz(String(module.id))
+      void trackModuleView(String(module.id))
     }
   }, [isOpen, module])
+
+  React.useEffect(() => {
+    if (!isOpen || !module || activeTab !== "quiz" || quizStartTracked) {
+      return
+    }
+
+    const quizId = supabaseQuiz?.id || String(module.id)
+    void trackQuizStart(String(module.id), quizId)
+    setQuizStartTracked(true)
+  }, [activeTab, isOpen, module, quizStartTracked, supabaseQuiz])
 
   const fetchSupabaseQuiz = async (moduleId: string) => {
     setQuizLoading(true)
@@ -79,6 +94,11 @@ export function ModuleDetailModal({
   }
 
   const handleQuizComplete = (result: QuizResult) => {
+    if (module) {
+      const quizId = supabaseQuiz?.id || String(module.id)
+      void trackQuizComplete(String(module.id), quizId, result.score, result.passed)
+    }
+
     if (result.passed) {
       setQuizPassed(true)
     }
@@ -324,9 +344,17 @@ export function ModuleDetailModal({
               </Button>
             )}
             {module.progress === 100 && (
-              <div className="flex items-center justify-center gap-2 py-2 text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="font-medium">Completed</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2 py-2 text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="font-medium">Completed</span>
+                </div>
+                <CertificateDownload
+                  moduleId={String(module.id)}
+                  moduleTitle={module.title}
+                  isCompleted={module.progress === 100}
+                  quizPassed={!supabaseQuiz || quizPassed}
+                />
               </div>
             )}
           </div>

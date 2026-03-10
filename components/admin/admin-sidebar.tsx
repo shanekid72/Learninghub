@@ -8,7 +8,8 @@ import {
   Users, 
   BookOpen, 
   FileBarChart,
-  Settings,
+  Megaphone,
+  Target,
   ArrowLeft
 } from "lucide-react"
 
@@ -16,6 +17,8 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/modules", label: "Modules", icon: BookOpen },
+  { href: "/admin/assignments", label: "Assignments", icon: Target },
+  { href: "/admin/updates", label: "Updates", icon: Megaphone },
   { href: "/admin/reports", label: "Reports", icon: FileBarChart },
 ]
 

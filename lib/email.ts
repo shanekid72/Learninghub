@@ -1,9 +1,12 @@
 import { Resend } from 'resend'
+import nodemailer, { type Transporter } from 'nodemailer'
 import { buildWelcomeEmail } from './email-templates/welcome'
 import { buildCompletionEmail } from './email-templates/completion'
 import { buildReminderEmail } from './email-templates/reminder'
+import { buildUpdateEmail } from './email-templates/update'
 
 let resendClient: Resend | null = null
+let smtpClient: Transporter | null = null
 
 function getResendClient(): Resend {
   if (!resendClient) {
@@ -16,9 +19,68 @@ function getResendClient(): Resend {
   return resendClient
 }
 
-const FROM_EMAIL = 'Learning Hub <noreply@learninghub.com>'
+function toBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (!value) return fallback
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
+}
 
-export type EmailType = 'welcome' | 'completion' | 'reminder' | 'certificate' | 'digest'
+function isSmtpConfigured(): boolean {
+  return Boolean(process.env.SMTP_USER && process.env.SMTP_APP_PASSWORD)
+}
+
+function isResendConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY)
+}
+
+export function isEmailProviderConfigured(): boolean {
+  return isSmtpConfigured() || isResendConfigured()
+}
+
+function getFromEmail(): string {
+  return process.env.EMAIL_FROM || 'Learning Hub <noreply@learninghub.com>'
+}
+
+function getSmtpClient(): Transporter {
+  if (!smtpClient) {
+    const user = process.env.SMTP_USER
+    const pass = process.env.SMTP_APP_PASSWORD
+    if (!user || !pass) {
+      throw new Error('SMTP_USER and SMTP_APP_PASSWORD environment variables are required for SMTP email')
+    }
+
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com'
+    const port = Number(process.env.SMTP_PORT || '465')
+    const secure = toBoolean(process.env.SMTP_SECURE, port === 465)
+
+    smtpClient = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    })
+  }
+
+  return smtpClient
+}
+
+type EmailProvider = 'smtp' | 'resend'
+
+function getProviderOrder(): EmailProvider[] {
+  const preferred = (process.env.EMAIL_PROVIDER || 'smtp').trim().toLowerCase()
+  const providers: EmailProvider[] = []
+
+  if (preferred === 'resend') {
+    if (isResendConfigured()) providers.push('resend')
+    if (isSmtpConfigured()) providers.push('smtp')
+    return providers
+  }
+
+  if (isSmtpConfigured()) providers.push('smtp')
+  if (isResendConfigured()) providers.push('resend')
+  return providers
+}
+
+export type EmailType = 'welcome' | 'completion' | 'reminder' | 'certificate' | 'update'
 
 interface SendEmailParams {
   to: string
@@ -71,18 +133,71 @@ export async function sendEmail({ to, type, data }: SendEmailParams) {
         })
         break
 
+      case 'update':
+        subject = (data.updateTitle as string) || 'New Learning Update'
+        html = buildUpdateEmail({
+          userName: data.userName as string,
+          moduleTitle: data.moduleTitle as string,
+          updateTitle: ((data.updateTitle as string) || 'New Learning Update'),
+          dueDate: data.dueDate as string | undefined,
+          note: data.note as string | undefined,
+          hubUrl: data.hubUrl as string,
+        })
+        break
+
       default:
         throw new Error(`Unknown email type: ${type}`)
     }
 
-    const result = await getResendClient().emails.send({
-      from: FROM_EMAIL,
-      to,
-      subject,
-      html,
-    })
+    const providers = getProviderOrder()
+    if (providers.length === 0) {
+      throw new Error(
+        'No email provider configured. Set SMTP_USER/SMTP_APP_PASSWORD for Gmail SMTP or RESEND_API_KEY for Resend.',
+      )
+    }
 
-    return { success: true, data: result }
+    const from = getFromEmail()
+    const providerErrors: Array<{ provider: EmailProvider; error: unknown }> = []
+
+    for (const provider of providers) {
+      try {
+        if (provider === 'smtp') {
+          const result = await getSmtpClient().sendMail({
+            from,
+            to,
+            subject,
+            html,
+          })
+
+          return {
+            success: true,
+            provider: 'smtp',
+            data: {
+              messageId: result.messageId,
+              accepted: result.accepted,
+              rejected: result.rejected,
+            },
+          }
+        }
+
+        const result = await getResendClient().emails.send({
+          from,
+          to,
+          subject,
+          html,
+        })
+
+        return { success: true, provider: 'resend', data: result }
+      } catch (error) {
+        providerErrors.push({ provider, error })
+      }
+    }
+
+    throw new Error(
+      `Email delivery failed for all providers: ${providerErrors
+        .map((entry) => entry.provider)
+        .join(', ')}`,
+    )
   } catch (error) {
     console.error('Failed to send email:', error)
     return { success: false, error }

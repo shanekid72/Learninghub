@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionContext } from "@/lib/app-session"
+import { createAdminClient } from "@/lib/supabase/server"
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSessionContext()
+    if (!session?.profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = await createAdminClient()
 
     const { data: certificates, error } = await supabase
       .from('certificates')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', session.profile.id)
       .order('issued_at', { ascending: false })
 
     if (error) {

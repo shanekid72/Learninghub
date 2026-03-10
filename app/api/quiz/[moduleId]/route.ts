@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server"
+import { getSessionContext } from "@/lib/app-session"
 import { createClient } from "@/lib/supabase/server"
-import { Quiz } from "@/lib/quiz-types"
+import { PublicQuizQuestion, Quiz, StoredQuizQuestion } from "@/lib/quiz-types"
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ moduleId: string }> }
 ) {
   try {
+    const session = await getSessionContext()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { moduleId } = await params
     const supabase = await createClient()
     
@@ -23,14 +29,16 @@ export async function GET(
       throw error
     }
 
+    const publicQuestions = (quiz.questions as unknown as StoredQuizQuestion[]).map((question) => {
+      const { correctAnswers: _correctAnswers, ...safeQuestion } = question
+      return safeQuestion as PublicQuizQuestion
+    })
+
     const formattedQuiz: Quiz = {
       id: quiz.id,
       moduleId: quiz.module_id,
       title: quiz.title,
-      questions: (quiz.questions as Quiz['questions']).map(q => ({
-        ...q,
-        correctAnswers: undefined
-      })),
+      questions: publicQuestions,
       passingScore: quiz.passing_score,
       createdAt: quiz.created_at
     }

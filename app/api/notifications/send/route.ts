@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionContext, hasAdminRole } from "@/lib/app-session"
+import { createAdminClient } from "@/lib/supabase/server"
 import { sendEmail, EmailType } from "@/lib/email"
 import { z } from "zod"
 import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
 
 const sendNotificationSchema = z.object({
-  type: z.enum(['welcome', 'completion', 'reminder', 'certificate', 'digest']),
+  type: z.enum(['welcome', 'completion', 'reminder', 'certificate', 'update']),
   userId: z.string().uuid().optional(),
   email: z.string().email().optional(),
   data: z.record(z.unknown()),
 })
+
+const notificationPreferenceByType = {
+  completion: "email_completion",
+  reminder: "email_reminders",
+  certificate: "email_certificate",
+  update: "email_digest",
+} as const
 
 export async function POST(request: Request) {
   try {
@@ -30,22 +38,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const { type, userId, email, data } = validation.data
-    const supabase = await createClient()
-
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    if (!currentUser) {
+    const session = await getSessionContext()
+    if (!session?.profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: currentProfile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', currentUser.id)
-      .single()
+    const { type, userId, email, data } = validation.data
+    const supabase = await createAdminClient()
 
-    const isSendingToSelf = userId === currentUser.id || email === currentUser.email
-    if (!isSendingToSelf && currentProfile?.role !== 'admin') {
+    const isSendingToSelf = userId === session.profile.id || email === session.profile.email
+    if (!isSendingToSelf && !hasAdminRole(session.profile)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -75,12 +77,12 @@ export async function POST(request: Request) {
       const { data: preferences } = await supabase
         .from('notification_preferences')
         .select('*')
-        .eq('user_id', userId || currentUser.id)
+        .eq('user_id', userId || session.profile.id)
         .single()
 
       if (preferences) {
-        const preferenceKey = `email_${type}` as keyof typeof preferences
-        if (preferences[preferenceKey] === false) {
+        const preferenceKey = notificationPreferenceByType[type]
+        if (preferenceKey && preferences[preferenceKey] === false) {
           return NextResponse.json({ 
             success: true, 
             message: 'Email not sent - user has disabled this notification type' 

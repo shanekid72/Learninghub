@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionContext } from "@/lib/app-session"
+import { createAdminClient } from "@/lib/supabase/server"
 import { z } from "zod"
 import { Comment } from "@/lib/comment-types"
+import { sanitizeCommentContent } from "@/lib/sanitize"
+import { canDeleteComment, canEditComment } from "@/lib/comment-permissions"
 
 const updateCommentSchema = z.object({
   content: z.string().min(1).max(2000),
@@ -14,6 +17,10 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
+    const session = await getSessionContext()
+    if (!session?.profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     
     const validation = updateCommentSchema.safeParse(body)
     if (!validation.success) {
@@ -23,13 +30,15 @@ export async function PUT(
       )
     }
 
-    const { content } = validation.data
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const sanitizedContent = sanitizeCommentContent(validation.data.content)
+    if (!sanitizedContent) {
+      return NextResponse.json(
+        { error: "Comment content is empty after sanitization" },
+        { status: 400 }
+      )
     }
+
+    const supabase = await createAdminClient()
 
     const { data: existingComment } = await supabase
       .from('comments')
@@ -41,13 +50,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
     }
 
-    if (existingComment.user_id !== user.id) {
+    if (!canEditComment(existingComment.user_id, session.profile.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { data: comment, error } = await supabase
       .from('comments')
-      .update({ content, updated_at: new Date().toISOString() })
+      .update({ content: sanitizedContent, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select(`
         *,
@@ -96,12 +105,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSessionContext()
+    if (!session?.profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const supabase = await createAdminClient()
 
     const { data: existingComment } = await supabase
       .from('comments')
@@ -113,16 +121,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const isOwner = existingComment.user_id === user.id
-    const isAdmin = profile?.role === 'admin'
-
-    if (!isOwner && !isAdmin) {
+    if (!canDeleteComment(existingComment.user_id, session.profile.id, session.profile.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

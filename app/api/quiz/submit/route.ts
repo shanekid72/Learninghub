@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { QuizSubmission, QuizResult, QuestionFeedback, QuizQuestion } from "@/lib/quiz-types"
+import { getSessionContext } from "@/lib/app-session"
+import { createAdminClient } from "@/lib/supabase/server"
+import { QuizSubmission, StoredQuizQuestion } from "@/lib/quiz-types"
 import { z } from "zod"
 import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
+import { scoreQuizSubmission } from "@/lib/quiz-scoring"
 
 const submissionSchema = z.object({
   quizId: z.string().uuid(),
@@ -29,13 +31,13 @@ export async function POST(request: Request) {
       )
     }
 
-    const submission: QuizSubmission = validation.data
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSessionContext()
+    if (!session?.profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const submission: QuizSubmission = validation.data
+    const supabase = await createAdminClient()
 
     const { data: quiz, error: quizError } = await supabase
       .from('quizzes')
@@ -47,55 +49,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Quiz not found' }, { status: 404 })
     }
 
-    const questions = quiz.questions as QuizQuestion[]
-    let correctCount = 0
-    const feedback: QuestionFeedback[] = []
-
-    for (const question of questions) {
-      const userAnswers = submission.answers[question.id] || []
-      const correctAnswers = question.correctAnswers
-      
-      const isCorrect = 
-        userAnswers.length === correctAnswers.length &&
-        userAnswers.every(a => correctAnswers.includes(a)) &&
-        correctAnswers.every(a => userAnswers.includes(a))
-
-      if (isCorrect) {
-        correctCount++
-      }
-
-      feedback.push({
-        questionId: question.id,
-        correct: isCorrect,
-        userAnswers,
-        correctAnswers,
-        explanation: question.explanation
-      })
-    }
-
-    const score = Math.round((correctCount / questions.length) * 100)
-    const passed = score >= quiz.passing_score
+    const questions = quiz.questions as unknown as StoredQuizQuestion[]
+    const result = scoreQuizSubmission(questions, submission.answers, quiz.passing_score)
 
     const { error: attemptError } = await supabase
       .from('quiz_attempts')
       .insert({
-        user_id: user.id,
+        user_id: session.profile.id,
         quiz_id: quiz.id,
         answers: submission.answers,
-        score,
-        passed
+        score: result.score,
+        passed: result.passed
       })
 
     if (attemptError) {
       console.error('Failed to save quiz attempt:', attemptError)
-    }
-
-    const result: QuizResult = {
-      score,
-      passed,
-      totalQuestions: questions.length,
-      correctAnswers: correctCount,
-      feedback
     }
 
     return NextResponse.json(result)

@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import { getRateLimitResponse, checkRateLimit, getClientIP } from "@/lib/rate-limit";
+import { isValidEmail } from "@/lib/sanitize";
+import {
+  createSignedSession,
+  getAuthCookieName,
+  getSessionTtlHours,
+} from "@/lib/auth-session";
 
 function allowedDomain(email: string) {
   const allowed = (process.env.AUTH_ALLOWED_EMAIL_DOMAINS || "")
@@ -12,6 +19,12 @@ function allowedDomain(email: string) {
 }
 
 export async function POST(req: Request) {
+  const clientIP = getClientIP(req);
+  const rateLimitResult = checkRateLimit(clientIP, "/api/auth/login");
+  if (!rateLimitResult.success) {
+    return getRateLimitResponse(rateLimitResult.resetIn);
+  }
+
   let body: { email?: string } = {};
   try {
     body = await req.json();
@@ -21,21 +34,31 @@ export async function POST(req: Request) {
 
   const clean = String(body.email || "").trim().toLowerCase();
 
-  if (!clean.includes("@")) {
+  if (!isValidEmail(clean)) {
     return NextResponse.json({ ok: false, error: "invalid_email" }, { status: 400 });
   }
   if (!allowedDomain(clean)) {
     return NextResponse.json({ ok: false, error: "domain_not_allowed" }, { status: 403 });
   }
 
-  const cookieName = process.env.AUTH_COOKIE_NAME || "lh_session";
-  const res = NextResponse.json({ ok: true });
+  let sessionToken: string;
+  try {
+    sessionToken = await createSignedSession(clean);
+  } catch {
+    return NextResponse.json({ ok: false, error: "missing_auth_secret" }, { status: 500 });
+  }
 
-  res.cookies.set(cookieName, clean, {
+  const ttlSeconds = Math.floor(getSessionTtlHours() * 3600);
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+  const cookieName = getAuthCookieName();
+  const res = NextResponse.json({ ok: true, email: clean, expiresAt });
+
+  res.cookies.set(cookieName, sessionToken, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    maxAge: ttlSeconds,
   });
 
   return res;

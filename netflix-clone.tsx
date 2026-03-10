@@ -37,6 +37,7 @@ import {
 import { useLearningHubModules, type LHModule } from "@/hooks/useLearningHubModules"
 import { useLearningHubCompletions } from "@/hooks/useLearningHubCompletions"
 import { useAuthEmail } from "@/hooks/useAuthEmail"
+import { trackModuleComplete, trackSearch } from "@/lib/analytics"
 
 /** Map an API module to the internal Module shape */
 function mapToModule(lh: LHModule): Module {
@@ -59,8 +60,10 @@ function mapToModule(lh: LHModule): Module {
     contentEmbedUrl: lh.content_embed_url || "",
     openUrl: lh.open_url || undefined,
     thumbnailUrl: lh.thumbnail_url || undefined,
-    lastUpdated: new Date().toISOString().slice(0, 10),
-    owner: "",
+    dueDate: lh.due_date || undefined,
+    lastUpdated: lh.last_updated || new Date().toISOString().slice(0, 10),
+    owner: lh.owner || "",
+    assigned: Boolean(lh.assigned),
   }
 }
 
@@ -69,7 +72,7 @@ type Page = "home" | "my-learning" | "role-paths" | "updates" | "library" | "sav
 export default function LearningHub() {
   const [isScrolled, setIsScrolled] = React.useState(false)
   const { modules: apiModules, loading } = useLearningHubModules()
-  const { email: authEmail } = useAuthEmail()
+  const { email: authEmail, user: authUser } = useAuthEmail()
   const { completions, refresh: refreshCompletions } = useLearningHubCompletions(authEmail)
 
   const [modules, setModules] = React.useState<Module[]>(mockModules)
@@ -80,6 +83,8 @@ export default function LearningHub() {
 
   const [modalOpen, setModalOpen] = React.useState(false)
   const [selectedModule, setSelectedModule] = React.useState<Module | null>(null)
+  const searchTrackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTrackedQueryRef = React.useRef("")
 
   // Sync API modules into state (fall back to mock data if API returns nothing)
   React.useEffect(() => {
@@ -97,13 +102,20 @@ export default function LearningHub() {
           return {
             ...m,
             saved: old?.saved ?? false,
-            assigned: isCompleted ? false : true,
+            assigned: isCompleted ? false : (m.assigned ?? old?.assigned ?? false),
+            dueDate: m.dueDate ?? old?.dueDate,
             progress: isCompleted ? 100 : (old?.progress ?? 0),
           }
         })
       })
     }
   }, [apiModules, loading, completions])
+
+  React.useEffect(() => {
+    if (authUser?.team) {
+      setSelectedTeam(authUser.team)
+    }
+  }, [authUser?.team])
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 0)
@@ -140,6 +152,7 @@ export default function LearningHub() {
 
       // pull fresh completions so My Learning stays correct after reload
       await refreshCompletions()
+      await trackModuleComplete(String(id))
     } catch (e) {
       console.error(e)
     }
@@ -164,7 +177,7 @@ export default function LearningHub() {
   const continueLearning = modules.filter(
     (m) => m.progress > 0 && m.progress < 100
   )
-  const assigned = modules.filter((m) => m.progress === 0)
+  const assigned = modules.filter((m) => m.assigned && m.progress === 0)
   const newHireEssentials = modules.filter(
     (m) =>
       m.title.toLowerCase().includes("onboarding") ||
@@ -181,6 +194,8 @@ export default function LearningHub() {
   const mandatory = modules.filter((m) => m.badges?.includes("MANDATORY"))
   const saved = modules.filter((m) => m.saved)
   const completed = modules.filter((m) => m.progress === 100)
+  const displayName = authUser?.fullName || currentUser.name
+  const displayEmail = authUser?.email || authEmail || currentUser.email
 
   const spotlight = modules.find((m) => m.badges?.includes("NEW") && m.type === "VIDEO") || modules[0]
 
@@ -196,6 +211,27 @@ export default function LearningHub() {
         m.owner.toLowerCase().includes(searchQuery.toLowerCase())
     )
     : []
+
+  React.useEffect(() => {
+    const query = searchQuery.trim()
+    if (!query) return
+
+    if (searchTrackTimerRef.current) {
+      clearTimeout(searchTrackTimerRef.current)
+    }
+
+    searchTrackTimerRef.current = setTimeout(() => {
+      if (lastTrackedQueryRef.current === query) return
+      void trackSearch(query, searchResults.length)
+      lastTrackedQueryRef.current = query
+    }, 450)
+
+    return () => {
+      if (searchTrackTimerRef.current) {
+        clearTimeout(searchTrackTimerRef.current)
+      }
+    }
+  }, [searchQuery, searchResults.length])
 
   const navItems: { label: string; page: Page }[] = [
     { label: "Home", page: "home" },
@@ -368,7 +404,7 @@ export default function LearningHub() {
                     variant="secondary"
                     className="bg-neutral-800/80 hover:bg-neutral-700 text-white px-6 gap-2"
                     onClick={() => {
-                      setSelectedTeam(spotlight.teams[0] || currentUser.team)
+                      setSelectedTeam(spotlight.teams[0] || authUser?.team || currentUser.team)
                       setActivePage("role-paths")
                     }}
                   >
@@ -483,7 +519,7 @@ export default function LearningHub() {
                 <div className="flex items-center gap-2 cursor-pointer">
                   <Avatar className="w-8 h-8 bg-red-600">
                     <AvatarFallback className="bg-red-600 text-white text-sm font-medium">
-                      {currentUser.name
+                      {displayName
                         .split(" ")
                         .map((n) => n[0])
                         .join("")}
@@ -494,7 +530,7 @@ export default function LearningHub() {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-neutral-900 border-neutral-800 text-white">
                 <DropdownMenuItem className="text-neutral-400 text-xs focus:bg-transparent cursor-default">
-                  {authEmail || currentUser.email}
+                  {displayEmail}
                 </DropdownMenuItem>
                 <DropdownMenuItem className="hover:bg-neutral-800 cursor-pointer">
                   Profile

@@ -3,20 +3,25 @@ export interface QuizOption {
   text: string
 }
 
-export interface QuizQuestion {
+export interface QuizQuestionBase {
   id: string
   type: 'multiple-choice' | 'true-false' | 'multi-select'
   text: string
   options: QuizOption[]
-  correctAnswers: string[]
   explanation?: string
 }
+
+export interface StoredQuizQuestion extends QuizQuestionBase {
+  correctAnswers: string[]
+}
+
+export type PublicQuizQuestion = QuizQuestionBase
 
 export interface Quiz {
   id: string
   moduleId: string
   title: string
-  questions: QuizQuestion[]
+  questions: PublicQuizQuestion[]
   passingScore: number
   createdAt?: string
 }

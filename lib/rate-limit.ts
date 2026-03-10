@@ -18,6 +18,10 @@ const routeConfigs: Record<string, RateLimitConfig> = {
   '/api/auth/login': { limit: 5, windowMs: 60 * 1000 },
 }
 
+export function resetRateLimitForTests() {
+  rateLimit.clear()
+}
+
 export function checkRateLimit(
   identifier: string,
   path: string
@@ -70,7 +74,7 @@ export function getClientIP(request: Request): string {
   return request.headers.get('x-real-ip') || 'unknown'
 }
 
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now()
   const maxAge = 5 * 60 * 1000
   
@@ -80,3 +84,5 @@ setInterval(() => {
     }
   }
 }, 60 * 1000)
+
+cleanupTimer.unref?.()

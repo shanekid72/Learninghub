@@ -1,25 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { getAuthCookieName, readEmailFromSession } from "@/lib/auth-session";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  const cookieName = process.env.AUTH_COOKIE_NAME || "lh_session";
-  const hasLegacySession = Boolean(req.cookies.get(cookieName)?.value);
-  
-  let hasSupabaseSession = false;
-  let supabaseResponse: NextResponse | null = null;
-  
-  try {
-    const result = await updateSession(req);
-    hasSupabaseSession = Boolean(result.user);
-    supabaseResponse = result.supabaseResponse;
-  } catch {
-    // Supabase not configured yet, continue with legacy auth
-  }
-  
-  const hasSession = hasLegacySession || hasSupabaseSession;
+  const cookieName = getAuthCookieName();
+  const hasSession = Boolean(
+    await readEmailFromSession(req.cookies.get(cookieName)?.value),
+  );
 
   if (pathname.startsWith("/hub") && !hasSession) {
     const url = req.nextUrl.clone();
@@ -39,7 +28,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return supabaseResponse || NextResponse.next();
+  return NextResponse.next();
 }
 
 export const config = {

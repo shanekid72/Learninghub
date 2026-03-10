@@ -17,7 +17,7 @@ interface AnalyticsEvent {
   user_id: string | null
   event_type: string
   module_id: string | null
-  metadata: Record<string, unknown> | null
+  metadata: unknown | null
   created_at: string
 }
 

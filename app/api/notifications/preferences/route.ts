@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionContext } from "@/lib/app-session"
+import { createAdminClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
 const preferencesSchema = z.object({
@@ -12,17 +13,17 @@ const preferencesSchema = z.object({
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSessionContext()
+    if (!session?.profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = await createAdminClient()
 
     const { data: preferences, error } = await supabase
       .from('notification_preferences')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', session.profile.id)
       .single()
 
     if (error && error.code !== 'PGRST116') {
@@ -31,7 +32,7 @@ export async function GET() {
 
     if (!preferences) {
       const defaultPreferences = {
-        user_id: user.id,
+        user_id: session.profile.id,
         email_welcome: true,
         email_completion: true,
         email_certificate: true,
@@ -75,17 +76,17 @@ export async function PUT(request: Request) {
     }
 
     const updates = validation.data
-    const supabase = await createClient()
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSessionContext()
+    if (!session?.profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = await createAdminClient()
 
     const { data: existing } = await supabase
       .from('notification_preferences')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', session.profile.id)
       .single()
 
     let result
@@ -93,13 +94,13 @@ export async function PUT(request: Request) {
       result = await supabase
         .from('notification_preferences')
         .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id)
+        .eq('user_id', session.profile.id)
         .select()
         .single()
     } else {
       result = await supabase
         .from('notification_preferences')
-        .insert({ user_id: user.id, ...updates })
+        .insert({ user_id: session.profile.id, ...updates })
         .select()
         .single()
     }

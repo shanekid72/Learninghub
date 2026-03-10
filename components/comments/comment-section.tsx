@@ -35,10 +35,15 @@ export function CommentSection({ moduleId }: CommentSectionProps) {
     fetchComments()
 
     const supabase = createClient()
-    
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setCurrentUserId(user?.id || null)
-    })
+
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { user?: { id?: string } } | null) => {
+        setCurrentUserId(payload?.user?.id || null)
+      })
+      .catch(() => {
+        setCurrentUserId(null)
+      })
 
     const channel = supabase
       .channel(`comments:${moduleId}`)

@@ -55,10 +55,10 @@ export function VideoModal({
     seasonTitle: string
   } | null>(null)
 
-  const controlsTimeoutRef = React.useRef<NodeJS.Timeout>()
-  const autoPlayTimerRef = React.useRef<NodeJS.Timeout>()
-  const countdownTimerRef = React.useRef<NodeJS.Timeout>()
-  const progressSaveIntervalRef = React.useRef<NodeJS.Timeout>() // Ref for progress saving interval
+  const controlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoPlayTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const countdownTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
+  const progressSaveIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null) // Ref for progress saving interval
 
   const seasonsData = seasons || sampleTVShowData[title as keyof typeof sampleTVShowData] || []
 

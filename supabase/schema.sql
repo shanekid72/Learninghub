@@ -133,6 +133,57 @@ CREATE POLICY "Admins can view all certificates" ON public.certificates
     EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
+-- Module assignments table
+CREATE TABLE IF NOT EXISTS public.module_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  module_source TEXT NOT NULL DEFAULT 'lh',
+  module_id TEXT NOT NULL,
+  user_id UUID REFERENCES public.profiles,
+  team TEXT,
+  due_date DATE,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_by UUID REFERENCES public.profiles,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT module_assignments_target_check CHECK ((user_id IS NOT NULL) <> (team IS NOT NULL))
+);
+
+-- Enable RLS on module_assignments
+ALTER TABLE public.module_assignments ENABLE ROW LEVEL SECURITY;
+
+-- Module assignments policies
+CREATE POLICY "Users can view assignments for themselves or their team" ON public.module_assignments
+  FOR SELECT USING (
+    user_id = auth.uid()
+    OR (
+      team IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM public.profiles p
+        WHERE p.id = auth.uid() AND p.team = module_assignments.team
+      )
+    )
+  );
+
+CREATE POLICY "Admins can view all module assignments" ON public.module_assignments
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can create module assignments" ON public.module_assignments
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can update module assignments" ON public.module_assignments
+  FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can delete module assignments" ON public.module_assignments
+  FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
 -- Comments table
 CREATE TABLE IF NOT EXISTS public.comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -244,6 +295,16 @@ CREATE TRIGGER on_profile_created
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_id ON public.quiz_attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz_id ON public.quiz_attempts(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_certificates_user_id ON public.certificates(user_id);
+CREATE INDEX IF NOT EXISTS idx_module_assignments_module_id ON public.module_assignments(module_source, module_id);
+CREATE INDEX IF NOT EXISTS idx_module_assignments_user_id ON public.module_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_module_assignments_team ON public.module_assignments(team);
+CREATE INDEX IF NOT EXISTS idx_module_assignments_active ON public.module_assignments(is_active);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_module_assignments_unique_user_active
+  ON public.module_assignments(module_source, module_id, user_id)
+  WHERE user_id IS NOT NULL AND is_active = true;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_module_assignments_unique_team_active
+  ON public.module_assignments(module_source, module_id, team)
+  WHERE team IS NOT NULL AND is_active = true;
 CREATE INDEX IF NOT EXISTS idx_comments_module_id ON public.comments(module_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user_id ON public.comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_user_id ON public.analytics_events(user_id);

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import type { Json } from '@/lib/supabase/database.types'
 
 export type EventType = 
   | 'module_view'
@@ -13,7 +14,7 @@ export type EventType =
 interface TrackEventParams {
   type: EventType
   moduleId?: string
-  metadata?: Record<string, unknown>
+  metadata?: Json
 }
 
 export async function trackEvent({ type, moduleId, metadata }: TrackEventParams) {

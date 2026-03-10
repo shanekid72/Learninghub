@@ -73,7 +73,7 @@ export const deleteWatchEntry = (contentId: number, episodeId?: number, userId: 
     }
     localStorage.setItem(getLocalStorageKey(userId), JSON.stringify(history))
   } catch (error) {
-    error("Failed to delete watch entry from localStorage:", error)
+    console.error("Failed to delete watch entry from localStorage:", error)
   }
 }
 

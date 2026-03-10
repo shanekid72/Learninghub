@@ -1,8 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
 import { ModuleAnalytics } from "@/components/admin/module-analytics"
 
+function asObject<T>(value: T | T[] | null): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] || null : value
+}
+
 export default async function AdminModulesPage() {
-  const supabase = await createClient()
+  const supabase = await createAdminClient()
 
   const { data: completionEvents } = await supabase
     .from("analytics_events")
@@ -24,11 +29,11 @@ export default async function AdminModulesPage() {
       )
     `)
 
-  const moduleStats = new Map<string, { views: number; completions: number; avgScore: number; attempts: number }>()
+  const moduleStats = new Map<string, { views: number; completions: number; scoreTotal: number; attempts: number }>()
 
   viewEvents?.forEach(event => {
     if (event.module_id) {
-      const current = moduleStats.get(event.module_id) || { views: 0, completions: 0, avgScore: 0, attempts: 0 }
+      const current = moduleStats.get(event.module_id) || { views: 0, completions: 0, scoreTotal: 0, attempts: 0 }
       current.views++
       moduleStats.set(event.module_id, current)
     }
@@ -36,15 +41,28 @@ export default async function AdminModulesPage() {
 
   completionEvents?.forEach(event => {
     if (event.module_id) {
-      const current = moduleStats.get(event.module_id) || { views: 0, completions: 0, avgScore: 0, attempts: 0 }
+      const current = moduleStats.get(event.module_id) || { views: 0, completions: 0, scoreTotal: 0, attempts: 0 }
       current.completions++
       moduleStats.set(event.module_id, current)
     }
   })
 
+  quizAttempts?.forEach((attempt) => {
+    const quiz = asObject(attempt.quizzes)
+    if (!quiz?.module_id) return
+
+    const current = moduleStats.get(quiz.module_id) || { views: 0, completions: 0, scoreTotal: 0, attempts: 0 }
+    current.attempts++
+    current.scoreTotal += attempt.score
+    moduleStats.set(quiz.module_id, current)
+  })
+
   const moduleStatsArray = Array.from(moduleStats.entries()).map(([moduleId, stats]) => ({
     moduleId,
-    ...stats,
+    views: stats.views,
+    completions: stats.completions,
+    attempts: stats.attempts,
+    avgScore: stats.attempts > 0 ? Math.round(stats.scoreTotal / stats.attempts) : 0,
     completionRate: stats.views > 0 ? Math.round((stats.completions / stats.views) * 100) : 0
   }))
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getSessionContext } from "@/lib/app-session"
+import { createAdminClient } from "@/lib/supabase/server"
 import { z } from "zod"
 import { Comment } from "@/lib/comment-types"
 import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
@@ -13,6 +14,11 @@ const createCommentSchema = z.object({
 
 export async function GET(request: Request) {
   try {
+    const session = await getSessionContext()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const moduleId = searchParams.get('moduleId')
 
@@ -20,7 +26,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'moduleId is required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const { data: comments, error } = await supabase
       .from('comments')
@@ -95,17 +101,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSessionContext()
+    if (!session?.profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = await createAdminClient()
 
     const { data: comment, error } = await supabase
       .from('comments')
       .insert({
-        user_id: user.id,
+        user_id: session.profile.id,
         module_id: moduleId,
         content: sanitizedContent,
         parent_id: parentId || null,

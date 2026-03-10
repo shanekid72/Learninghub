@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { CertificatePreview } from "./certificate-preview"
 import { CertificateData } from "@/lib/certificate-types"
 import { Award, Loader2 } from "lucide-react"
+import { trackCertificateGenerated } from "@/lib/analytics"
 
 interface CertificateDownloadProps {
   moduleId: string
@@ -47,6 +48,7 @@ export function CertificateDownload({
       const data: CertificateData = await response.json()
       setCertificateData(data)
       setShowPreview(true)
+      await trackCertificateGenerated(moduleId, data.certificateId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate certificate')
     } finally {
