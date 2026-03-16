@@ -286,16 +286,18 @@ async function runReminderJob(request: Request) {
     }
 
     runStats.sent += 1
-    analyticsEvents.push({
-      user_id: candidate.userId,
-      event_type: "reminder_sent",
-      module_id: candidate.moduleId,
-      metadata: {
-        dueDate: candidate.dueDate,
-        source: "assignment-reminder-cron",
-        dryRun,
-      },
-    })
+    if (!dryRun) {
+      analyticsEvents.push({
+        user_id: candidate.userId,
+        event_type: "reminder_sent",
+        module_id: candidate.moduleId,
+        metadata: {
+          dueDate: candidate.dueDate,
+          source: "assignment-reminder-cron",
+          dryRun,
+        },
+      })
+    }
   }
 
   if (analyticsEvents.length > 0) {
