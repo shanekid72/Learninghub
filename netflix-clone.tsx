@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   Bell,
   ChevronDown,
@@ -14,6 +15,7 @@ import {
   Presentation,
   ChevronLeft,
   ChevronRight,
+  LayoutDashboard,
   Loader2,
 } from "lucide-react"
 
@@ -204,6 +206,7 @@ export default function LearningHub() {
   const completed = modules.filter((m) => m.progress === 100)
   const displayName = authUser?.fullName || authEmail.split("@")[0] || "Learner"
   const displayEmail = authUser?.email || authEmail || ""
+  const isAdmin = authUser?.role === "admin"
 
   const spotlight = modules.find((m) => m.badges?.includes("NEW") && m.type === "VIDEO") || modules[0] || null
 
@@ -493,6 +496,15 @@ export default function LearningHub() {
                   {item.label}
                 </button>
               ))}
+              {isAdmin ? (
+                <Link
+                  href="/admin"
+                  className="ml-2 inline-flex items-center gap-2 rounded-md border border-emerald-700/60 bg-emerald-900/20 px-3 py-1.5 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-900/40 hover:text-white"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Admin
+                </Link>
+              ) : null}
             </nav>
           </div>
           <div className="flex items-center gap-3">
@@ -552,6 +564,14 @@ export default function LearningHub() {
                 <DropdownMenuItem className="text-neutral-400 text-xs focus:bg-transparent cursor-default">
                   {displayEmail}
                 </DropdownMenuItem>
+                {isAdmin ? (
+                  <DropdownMenuItem asChild className="hover:bg-neutral-800 cursor-pointer">
+                    <Link href="/admin" className="flex items-center gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Admin Console
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem className="hover:bg-neutral-800 cursor-pointer">
                   Profile
                 </DropdownMenuItem>
@@ -591,6 +611,14 @@ export default function LearningHub() {
                     {item.label}
                   </DropdownMenuItem>
                 ))}
+                {isAdmin ? (
+                  <DropdownMenuItem asChild className="hover:bg-neutral-800 cursor-pointer">
+                    <Link href="/admin" className="flex items-center gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Admin
+                    </Link>
+                  </DropdownMenuItem>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
