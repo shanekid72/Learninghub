@@ -28,12 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ModuleDetailModal } from "./components/module-detail-modal"
-import {
-  mockModules,
-  currentUser,
-  teams,
-  type Module,
-} from "@/lib/learning-data"
+import { type Module } from "@/lib/module-types"
 import { useLearningHubModules, type LHModule } from "@/hooks/useLearningHubModules"
 import { useLearningHubCompletions } from "@/hooks/useLearningHubCompletions"
 import { useAuthEmail } from "@/hooks/useAuthEmail"
@@ -51,6 +46,7 @@ function mapToModule(lh: LHModule): Module {
   return {
     id: lh.id,
     title: lh.title,
+    description: lh.description || undefined,
     objective: lh.objective || "",
     durationMins: lh.duration_mins || 0,
     type: ((lh.type || "VIDEO").toUpperCase() as Module["type"]),
@@ -60,6 +56,8 @@ function mapToModule(lh: LHModule): Module {
     contentEmbedUrl: lh.content_embed_url || "",
     openUrl: lh.open_url || undefined,
     thumbnailUrl: lh.thumbnail_url || undefined,
+    quizEmbedUrl: lh.quiz_embed_url || undefined,
+    quizUrl: lh.quiz_url || undefined,
     dueDate: lh.due_date || undefined,
     lastUpdated: lh.last_updated || new Date().toISOString().slice(0, 10),
     owner: lh.owner || "",
@@ -71,24 +69,24 @@ type Page = "home" | "my-learning" | "role-paths" | "updates" | "library" | "sav
 
 export default function LearningHub() {
   const [isScrolled, setIsScrolled] = React.useState(false)
-  const { modules: apiModules, loading } = useLearningHubModules()
+  const { modules: apiModules, teams: apiTeams, loading } = useLearningHubModules()
   const { email: authEmail, user: authUser } = useAuthEmail()
   const { completions, refresh: refreshCompletions } = useLearningHubCompletions(authEmail)
 
-  const [modules, setModules] = React.useState<Module[]>(mockModules)
+  const [modules, setModules] = React.useState<Module[]>([])
   const [activePage, setActivePage] = React.useState<Page>("home")
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchOpen, setSearchOpen] = React.useState(false)
-  const [selectedTeam, setSelectedTeam] = React.useState(currentUser.team)
+  const [selectedTeam, setSelectedTeam] = React.useState("")
 
   const [modalOpen, setModalOpen] = React.useState(false)
   const [selectedModule, setSelectedModule] = React.useState<Module | null>(null)
   const searchTrackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTrackedQueryRef = React.useRef("")
 
-  // Sync API modules into state (fall back to mock data if API returns nothing)
+  // Sync Supabase-backed module data into local UI state while preserving saved/progress UI state.
   React.useEffect(() => {
-    if (!loading && apiModules.length > 0) {
+    if (!loading) {
       const completedSet = new Set(completions.map((c) => String(c.module_id)))
 
       setModules((prev) => {
@@ -111,11 +109,21 @@ export default function LearningHub() {
     }
   }, [apiModules, loading, completions])
 
+  const teamOptions = React.useMemo(() => {
+    const derivedTeams = modules.flatMap((module) => module.teams)
+    return [...new Set([...apiTeams, ...derivedTeams].filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  }, [apiTeams, modules])
+
   React.useEffect(() => {
     if (authUser?.team) {
       setSelectedTeam(authUser.team)
+      return
     }
-  }, [authUser?.team])
+
+    if (!selectedTeam && teamOptions.length > 0) {
+      setSelectedTeam(teamOptions[0])
+    }
+  }, [authUser?.team, selectedTeam, teamOptions])
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 0)
@@ -194,10 +202,10 @@ export default function LearningHub() {
   const mandatory = modules.filter((m) => m.badges?.includes("MANDATORY"))
   const saved = modules.filter((m) => m.saved)
   const completed = modules.filter((m) => m.progress === 100)
-  const displayName = authUser?.fullName || currentUser.name
-  const displayEmail = authUser?.email || authEmail || currentUser.email
+  const displayName = authUser?.fullName || authEmail.split("@")[0] || "Learner"
+  const displayEmail = authUser?.email || authEmail || ""
 
-  const spotlight = modules.find((m) => m.badges?.includes("NEW") && m.type === "VIDEO") || modules[0]
+  const spotlight = modules.find((m) => m.badges?.includes("NEW") && m.type === "VIDEO") || modules[0] || null
 
   // Search
   const searchResults = searchQuery.trim()
@@ -279,7 +287,7 @@ export default function LearningHub() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-neutral-900 border-neutral-800 text-white">
-                  {teams.map((team) => (
+                  {teamOptions.map((team) => (
                     <DropdownMenuItem
                       key={team}
                       onClick={() => setSelectedTeam(team)}
@@ -373,6 +381,18 @@ export default function LearningHub() {
             </div>
           )
         }
+        if (!spotlight) {
+          return (
+            <div className="flex min-h-[70vh] items-center justify-center px-6 text-center">
+              <div className="max-w-xl space-y-3">
+                <h1 className="text-3xl font-bold text-white">No published modules yet</h1>
+                <p className="text-neutral-400">
+                  The learning catalog is empty right now. Publish modules from the admin panel and they will appear here.
+                </p>
+              </div>
+            </div>
+          )
+        }
         return (
           <>
             {/* Hero */}
@@ -404,7 +424,7 @@ export default function LearningHub() {
                     variant="secondary"
                     className="bg-neutral-800/80 hover:bg-neutral-700 text-white px-6 gap-2"
                     onClick={() => {
-                      setSelectedTeam(spotlight.teams[0] || authUser?.team || currentUser.team)
+                      setSelectedTeam(spotlight.teams[0] || authUser?.team || teamOptions[0] || "")
                       setActivePage("role-paths")
                     }}
                   >

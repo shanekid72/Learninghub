@@ -36,16 +36,17 @@ export async function GET(
       .eq('id', certificate.user_id)
       .single()
 
+    const issuedAt = certificate.issued_at || new Date().toISOString()
     const certificateData: CertificateData = {
       certificateId: certificate.id,
       userName: profile?.full_name || profile?.email || 'Learner',
       moduleTitle: certificate.module_id,
-      completionDate: new Date(certificate.issued_at).toLocaleDateString('en-US', {
+      completionDate: new Date(issuedAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       }),
-      issuedAt: certificate.issued_at
+      issuedAt
     }
 
     return NextResponse.json(certificateData)

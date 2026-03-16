@@ -50,7 +50,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
       ? {
           id: profile.id,
           email: profile.email,
-          role: profile.role,
+          role: profile.role || "learner",
           fullName: profile.full_name,
           team: profile.team,
         }

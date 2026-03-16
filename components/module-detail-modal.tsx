@@ -21,7 +21,7 @@ import { EmbedFrame } from "./embed-frame"
 import { QuizContainer } from "./quiz"
 import { CommentSection } from "./comments"
 import { CertificateDownload } from "./certificate/certificate-download"
-import type { Module } from "@/lib/learning-data"
+import type { Module } from "@/lib/module-types"
 import type { Quiz, QuizResult } from "@/lib/quiz-types"
 import { trackModuleView, trackQuizComplete, trackQuizStart } from "@/lib/analytics"
 

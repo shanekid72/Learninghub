@@ -49,8 +49,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Quiz not found' }, { status: 404 })
     }
 
+    const { data: module, error: moduleError } = await supabase
+      .from("learning_modules")
+      .select("module_id, status, quiz_mode")
+      .eq("module_id", quiz.module_id)
+      .maybeSingle()
+
+    if (moduleError) {
+      throw moduleError
+    }
+
+    if (!module || module.status !== "published" || module.quiz_mode !== "internal") {
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
+    }
+
     const questions = quiz.questions as unknown as StoredQuizQuestion[]
-    const result = scoreQuizSubmission(questions, submission.answers, quiz.passing_score)
+    const result = scoreQuizSubmission(questions, submission.answers, quiz.passing_score ?? 70)
 
     const { error: attemptError } = await supabase
       .from('quiz_attempts')

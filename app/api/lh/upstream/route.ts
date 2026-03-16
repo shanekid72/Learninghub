@@ -1,45 +1,11 @@
 import { NextResponse } from "next/server"
-import { mockModules } from "@/lib/learning-data"
+import { mapModuleRowToLearnerModule, type LearningModuleRow } from "@/lib/learning-modules"
 import { createAdminClient } from "@/lib/supabase/server"
 import type { Database } from "@/lib/supabase/database.types"
 
 export const runtime = "nodejs"
 
 type CompletionInsert = Database["public"]["Tables"]["analytics_events"]["Insert"]
-
-type FallbackModule = {
-  id: number | string
-  title: string
-  objective: string
-  type: string
-  duration_mins: number
-  thumbnail_url: string
-  content_embed_url: string
-  open_url: string
-  badges: string
-  teams: string
-  sort_order: number
-  due_date: string | null
-  last_updated: string
-  owner: string
-}
-
-const fallbackModules: FallbackModule[] = mockModules.map((module, index) => ({
-  id: module.id,
-  title: module.title,
-  objective: module.objective,
-  type: module.type,
-  duration_mins: module.durationMins,
-  thumbnail_url: module.thumbnailUrl || "",
-  content_embed_url: module.contentEmbedUrl || "",
-  open_url: module.openUrl || "",
-  badges: module.badges?.join(",") || "",
-  teams: module.teams.join(","),
-  sort_order: index + 1,
-  due_date: module.dueDate || null,
-  last_updated: module.lastUpdated,
-  owner: module.owner,
-}))
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null
@@ -71,7 +37,32 @@ function ensureApiKey(url: URL): NextResponse | null {
 }
 
 async function handleModules() {
-  return NextResponse.json({ ok: true, modules: fallbackModules })
+  const supabase = await createAdminClient()
+  const [{ data: modules, error: modulesError }, { data: teams, error: teamsError }] = await Promise.all([
+    supabase
+      .from("learning_modules")
+      .select("*")
+      .eq("status", "published")
+      .order("sort_order", { ascending: true })
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("learning_teams")
+      .select("name")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+  ])
+
+  if (modulesError) throw modulesError
+  if (teamsError) throw teamsError
+
+  return NextResponse.json({
+    ok: true,
+    teams: (teams || []).map((team) => team.name),
+    modules: ((modules || []) as LearningModuleRow[]).map((module) =>
+      mapModuleRowToLearnerModule(module),
+    ),
+  })
 }
 
 async function handleCompletions(url: URL) {
@@ -89,7 +80,7 @@ async function handleCompletions(url: URL) {
     .select("module_id, created_at, metadata")
     .eq("event_type", "module_complete")
     .order("created_at", { ascending: false })
-    .limit(2000)
+    .limit(5000)
 
   if (error) {
     console.error("Fallback completions query failed:", error)
@@ -106,6 +97,7 @@ async function handleCompletions(url: URL) {
 
   for (const row of data || []) {
     const moduleId = row.module_id ? String(row.module_id) : ""
+    const completedAt = row.created_at || new Date().toISOString()
     if (!moduleId) continue
 
     const metadata =
@@ -117,7 +109,6 @@ async function handleCompletions(url: URL) {
     if (!rowEmail || rowEmail !== email) continue
 
     const existing = latestByModule.get(moduleId)
-    const completedAt = row.created_at
     if (existing && existing.completed_at >= completedAt) continue
 
     latestByModule.set(moduleId, {
@@ -172,7 +163,7 @@ async function handleMarkComplete(request: Request) {
     metadata: {
       email,
       source,
-      via: "lh-upstream-fallback",
+      via: "lh-upstream-compat",
     },
   }
 

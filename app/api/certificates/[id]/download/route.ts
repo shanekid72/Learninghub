@@ -36,7 +36,8 @@ export async function GET(
       .single()
 
     const userName = profile?.full_name || profile?.email || 'Learner'
-    const completionDate = new Date(certificate.issued_at).toLocaleDateString('en-US', {
+    const issuedAt = certificate.issued_at || new Date().toISOString()
+    const completionDate = new Date(issuedAt).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'

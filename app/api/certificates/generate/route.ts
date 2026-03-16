@@ -47,16 +47,17 @@ export async function POST(request: Request) {
       .single()
 
     if (existingCert) {
+      const issuedAt = existingCert.issued_at || new Date().toISOString()
       const certificateData: CertificateData = {
         certificateId: existingCert.id,
         userName,
         moduleTitle,
-        completionDate: new Date(existingCert.issued_at).toLocaleDateString('en-US', {
+        completionDate: new Date(issuedAt).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'long',
           day: 'numeric'
         }),
-        issuedAt: existingCert.issued_at
+        issuedAt
       }
       return NextResponse.json(certificateData)
     }
@@ -74,16 +75,17 @@ export async function POST(request: Request) {
       throw insertError
     }
 
+    const issuedAt = newCert.issued_at || new Date().toISOString()
     const certificateData: CertificateData = {
       certificateId: newCert.id,
       userName,
       moduleTitle,
-      completionDate: new Date(newCert.issued_at).toLocaleDateString('en-US', {
+      completionDate: new Date(issuedAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       }),
-      issuedAt: newCert.issued_at
+      issuedAt
     }
 
     return NextResponse.json(certificateData)

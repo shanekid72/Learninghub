@@ -20,7 +20,13 @@ export default async function AdminUsersPage() {
         <p className="text-neutral-400 mt-1">Manage learners and administrators</p>
       </div>
 
-      <UserTable users={users || []} />
+      <UserTable
+        users={(users || []).map((user) => ({
+          ...user,
+          role: user.role || "learner",
+          created_at: user.created_at || new Date().toISOString(),
+        }))}
+      />
     </div>
   )
 }

@@ -224,7 +224,7 @@ export async function POST(request: Request) {
 
     const digestEnabled = new Map<string, boolean>()
     for (const row of preferenceRows.data || []) {
-      digestEnabled.set(row.user_id, row.email_digest)
+      digestEnabled.set(row.user_id, row.email_digest ?? true)
     }
 
     const emailStats = { sent: 0, skipped: 0, failed: 0 }

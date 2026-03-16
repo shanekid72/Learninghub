@@ -110,8 +110,8 @@ pnpm test:e2e
   - Verify required variables in `.env.local`
 - Supabase auth/API routes returning unauthorized:
   - Confirm `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and session cookie secret values
-- Empty module/completion data:
-  - Check `LH_BASE_URL` and `LH_API_KEY`
+- Empty module/catalog data:
+  - Check `SUPABASE_SERVICE_ROLE_KEY` and seeded `learning_modules` rows
 - Email sending fails:
   - Check Gmail SMTP vars (`SMTP_USER`, `SMTP_APP_PASSWORD`, `EMAIL_FROM`) or `RESEND_API_KEY`
 
@@ -132,9 +132,10 @@ Owner responsibilities by phase are in [`docs/PHASE_TASKS.md`](docs/PHASE_TASKS.
 - Admin update publish endpoint: `POST /api/admin/updates/publish`
 - Cron reminder endpoint: `GET|POST /api/cron/assignment-reminders` (requires `CRON_SECRET`)
 
-## LH Fallback Upstream
+## LH Compatibility Upstream
 
-If you do not have an external LearningHub upstream service yet, you can use the built-in compatible endpoint:
+The primary app flow now reads modules, completions, and quizzes directly from Supabase.
+If you still need a legacy LearningHub-compatible upstream endpoint for external consumers, you can use:
 
 - `LH_BASE_URL=https://<your-domain>/api/lh/upstream`
 - `LH_API_KEY=<your-random-shared-key>`

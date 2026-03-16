@@ -4,8 +4,8 @@ import * as React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ModulePicker, type ModulePickerItem } from "@/components/admin/module-picker"
 import { Loader2 } from "lucide-react"
-import { teams as defaultTeams } from "@/lib/learning-data"
 
 type TargetType = "team" | "user" | "all"
 
@@ -24,8 +24,16 @@ type PublishResponse = {
   emailProviderConfigured: boolean
 }
 
+type LearningTeam = {
+  id: string
+  name: string
+  is_active: boolean
+  sort_order: number
+}
+
 export default function AdminUpdatesPage() {
   const [users, setUsers] = React.useState<AdminUser[]>([])
+  const [teams, setTeams] = React.useState<LearningTeam[]>([])
   const [loadingUsers, setLoadingUsers] = React.useState(true)
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -35,27 +43,36 @@ export default function AdminUpdatesPage() {
   const [moduleTitle, setModuleTitle] = React.useState("")
   const [updateTitle, setUpdateTitle] = React.useState("New Learning Update")
   const [targetType, setTargetType] = React.useState<TargetType>("team")
-  const [selectedTeam, setSelectedTeam] = React.useState(defaultTeams[0] || "")
+  const [selectedTeam, setSelectedTeam] = React.useState("")
   const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([])
   const [dueDate, setDueDate] = React.useState("")
   const [note, setNote] = React.useState("")
   const [sendEmail, setSendEmail] = React.useState(true)
 
   const teamOptions = React.useMemo(() => {
+    const fromTaxonomy = teams.filter((team) => team.is_active).map((team) => team.name)
     const fromUsers = users.map((user) => user.team).filter(Boolean) as string[]
-    return [...new Set([...defaultTeams, ...fromUsers])].sort((a, b) => a.localeCompare(b))
-  }, [users])
+    return [...new Set([...fromTaxonomy, ...fromUsers])].sort((a, b) => a.localeCompare(b))
+  }, [teams, users])
 
   React.useEffect(() => {
     ;(async () => {
       setLoadingUsers(true)
       try {
-        const response = await fetch("/api/admin/assignments?includeUsers=1", { cache: "no-store" })
-        if (!response.ok) {
+        const [usersResponse, teamsResponse] = await Promise.all([
+          fetch("/api/admin/assignments?includeUsers=1", { cache: "no-store" }),
+          fetch("/api/admin/teams", { cache: "no-store" }),
+        ])
+        if (!usersResponse.ok) {
           throw new Error("Failed to load users")
         }
-        const payload = (await response.json()) as { users?: AdminUser[] }
+        if (!teamsResponse.ok) {
+          throw new Error("Failed to load teams")
+        }
+        const payload = (await usersResponse.json()) as { users?: AdminUser[] }
+        const teamsPayload = (await teamsResponse.json()) as { teams?: LearningTeam[] }
         setUsers(payload.users || [])
+        setTeams(teamsPayload.teams || [])
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load users")
       } finally {
@@ -63,6 +80,12 @@ export default function AdminUpdatesPage() {
       }
     })()
   }, [])
+
+  React.useEffect(() => {
+    if (!selectedTeam && teamOptions.length > 0) {
+      setSelectedTeam(teamOptions[0])
+    }
+  }, [selectedTeam, teamOptions])
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUserIds((previous) =>
@@ -74,7 +97,7 @@ export default function AdminUpdatesPage() {
 
   const handlePublish = async () => {
     if (!moduleId.trim() || !moduleTitle.trim()) {
-      setError("Module ID and Module Title are required")
+      setError("Please select a module")
       return
     }
     if (targetType === "team" && !selectedTeam) {
@@ -144,21 +167,24 @@ export default function AdminUpdatesPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm text-neutral-400">Module ID</label>
-              <Input
+              <label className="mb-2 block text-sm text-neutral-400">Module</label>
+              <ModulePicker
                 value={moduleId}
-                onChange={(event) => setModuleId(event.target.value)}
-                className="bg-neutral-800 border-neutral-700 text-white"
-                placeholder="e.g. onboarding-week-1"
+                onSelect={(module: ModulePickerItem) => {
+                  setModuleId(module.moduleId)
+                  setModuleTitle(module.title)
+                }}
+                disabled={submitting}
+                placeholder="Search published modules"
               />
             </div>
             <div>
               <label className="mb-2 block text-sm text-neutral-400">Module Title</label>
               <Input
                 value={moduleTitle}
-                onChange={(event) => setModuleTitle(event.target.value)}
+                readOnly
                 className="bg-neutral-800 border-neutral-700 text-white"
-                placeholder="e.g. Onboarding Week 1"
+                placeholder="Selected automatically from the module catalog"
               />
             </div>
           </div>

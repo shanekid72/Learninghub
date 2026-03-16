@@ -12,11 +12,6 @@ type Candidate = {
   dueDate: string
 }
 
-type UpstreamModule = {
-  id: string | number
-  title?: string
-}
-
 type AnalyticsEventInsert = Database["public"]["Tables"]["analytics_events"]["Insert"]
 
 function toDateOnly(date: Date): string {
@@ -46,20 +41,18 @@ function getBearerToken(authHeader: string | null): string | null {
 }
 
 async function fetchModuleTitleMap(): Promise<Map<string, string>> {
-  const base = process.env.LH_BASE_URL
-  const key = process.env.LH_API_KEY
-  if (!base || !key) return new Map()
-
   try {
-    const res = await fetch(`${base}?action=modules&key=${encodeURIComponent(key)}`, { cache: "no-store" })
-    const contentType = res.headers.get("content-type") || ""
-    if (!contentType.includes("application/json")) return new Map()
+    const supabase = await createAdminClient()
+    const { data, error } = await supabase
+      .from("learning_modules")
+      .select("module_id, title")
 
-    const json = (await res.json()) as { modules?: UpstreamModule[] }
+    if (error) throw error
+
     const map = new Map<string, string>()
-    for (const moduleItem of json.modules || []) {
+    for (const moduleItem of data || []) {
       if (!moduleItem?.title) continue
-      map.set(String(moduleItem.id), moduleItem.title)
+      map.set(String(moduleItem.module_id), moduleItem.title)
     }
     return map
   } catch (error) {

@@ -51,6 +51,7 @@ export default async function AdminDashboard() {
 
     const indexByDate = new Map(series.map((entry, idx) => [entry.key, idx]))
     for (const event of completionEvents || []) {
+      if (!event.created_at) continue
       const key = event.created_at.slice(0, 10)
       const idx = indexByDate.get(key)
       if (idx !== undefined) {
@@ -88,7 +89,12 @@ export default async function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <AnalyticsCharts completionData={completionData} statusData={statusData} />
-        <RecentActivity events={eventsResult.data || []} />
+        <RecentActivity
+          events={(eventsResult.data || []).map((event) => ({
+            ...event,
+            created_at: event.created_at || new Date().toISOString(),
+          }))}
+        />
       </div>
     </div>
   )

@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react"
 
-/** Shape returned from the Google Apps Script API */
+/** Shape returned from the LearningHub module API */
 export interface LHModule {
     id: number | string
     title: string
+    description?: string | null
     objective: string
     type: string
     duration_mins: number
@@ -15,6 +16,9 @@ export interface LHModule {
     badges: string
     teams: string
     sort_order: number
+    quiz_mode?: string | null
+    quiz_embed_url?: string | null
+    quiz_url?: string | null
     assigned?: boolean
     due_date?: string | null
     last_updated?: string | null
@@ -23,6 +27,7 @@ export interface LHModule {
 
 export function useLearningHubModules() {
     const [modules, setModules] = useState<LHModule[]>([])
+    const [teams, setTeams] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -35,6 +40,7 @@ export function useLearningHubModules() {
 
                 if (!cancelled && json?.modules) {
                     setModules(json.modules)
+                    setTeams(Array.isArray(json.teams) ? json.teams : [])
                 }
             } catch (err) {
                 console.error("Failed to load modules:", err)
@@ -47,5 +53,5 @@ export function useLearningHubModules() {
         return () => { cancelled = true }
     }, [])
 
-    return { modules, loading }
+    return { modules, teams, loading }
 }

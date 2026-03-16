@@ -23,10 +23,7 @@ export function useLearningHubCompletions(email: string) {
 
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/lh/completions?email=${encodeURIComponent(normalizedEmail)}`,
-        { cache: "no-store" }
-      );
+      const res = await fetch("/api/lh/completions", { cache: "no-store" });
       const data = await res.json();
       setCompletions(data.completions || []);
     } catch (err) {

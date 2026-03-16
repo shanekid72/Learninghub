@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSessionContext } from "@/lib/app-session"
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
 import { PublicQuizQuestion, Quiz, StoredQuizQuestion } from "@/lib/quiz-types"
 
 export async function GET(
@@ -14,8 +14,22 @@ export async function GET(
     }
 
     const { moduleId } = await params
-    const supabase = await createClient()
-    
+    const supabase = await createAdminClient()
+
+    const { data: module, error: moduleError } = await supabase
+      .from("learning_modules")
+      .select("module_id, status, quiz_mode")
+      .eq("module_id", moduleId)
+      .maybeSingle()
+
+    if (moduleError) {
+      throw moduleError
+    }
+
+    if (!module || module.status !== "published" || module.quiz_mode !== "internal") {
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
+    }
+
     const { data: quiz, error } = await supabase
       .from('quizzes')
       .select('*')
@@ -39,8 +53,8 @@ export async function GET(
       moduleId: quiz.module_id,
       title: quiz.title,
       questions: publicQuestions,
-      passingScore: quiz.passing_score,
-      createdAt: quiz.created_at
+      passingScore: quiz.passing_score ?? 70,
+      createdAt: quiz.created_at || undefined
     }
 
     return NextResponse.json(formattedQuiz)

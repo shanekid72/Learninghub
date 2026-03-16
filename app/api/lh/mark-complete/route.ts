@@ -1,44 +1,62 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getAuthCookieName, readEmailFromSession } from "@/lib/auth-session";
+import { NextResponse } from "next/server"
+import { z } from "zod"
+import { getSessionContext } from "@/lib/app-session"
+import { createAdminClient } from "@/lib/supabase/server"
 
-export const runtime = "nodejs";
+export const runtime = "nodejs"
+
+const markCompleteSchema = z.object({
+  moduleId: z.string().trim().min(1).optional(),
+  module_id: z.string().trim().min(1).optional(),
+  source: z.string().trim().min(1).max(80).optional(),
+})
 
 export async function POST(req: Request) {
-    const cookieStore = await cookies();
-    const authEmail = await readEmailFromSession(
-        cookieStore.get(getAuthCookieName())?.value,
-    );
-    if (!authEmail) {
-        return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const session = await getSessionContext()
+  if (!session) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
+  }
+
+  try {
+    const body = await req.json()
+    const parsed = markCompleteSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: "invalid_payload", details: parsed.error.issues },
+        { status: 400 },
+      )
     }
 
-    const base = process.env.LH_BASE_URL;
-    const key = process.env.LH_API_KEY;
-    if (!base || !key) return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-
-    const body = (await req.json()) as Record<string, unknown>;
-    const _compatEmail = typeof body.email === "string" ? body.email : null;
-    void _compatEmail;
-    const url = `${base}?action=markComplete&key=${encodeURIComponent(key)}`;
-
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            ...body,
-            email: authEmail,
-        }),
-    });
-
-    const text = await res.text();
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-        return NextResponse.json(
-            { ok: false, error: "upstream_not_json", status: res.status, contentType, snippet: text.slice(0, 200) },
-            { status: 500 }
-        );
+    const moduleId = parsed.data.moduleId || parsed.data.module_id
+    if (!moduleId) {
+      return NextResponse.json({ ok: false, error: "missing_module_id" }, { status: 400 })
     }
 
-    return NextResponse.json(JSON.parse(text));
+    const supabase = await createAdminClient()
+    const { error } = await supabase.from("analytics_events").insert({
+      user_id: session.profile?.id || null,
+      event_type: "module_complete",
+      module_id: moduleId,
+      metadata: {
+        email: session.email,
+        source: parsed.data.source || "portal",
+        via: "portal",
+      },
+    })
+
+    if (error) throw error
+
+    return NextResponse.json({
+      ok: true,
+      completion: {
+        email: session.email,
+        module_id: moduleId,
+        completed_at: new Date().toISOString(),
+        source: parsed.data.source || "portal",
+      },
+    })
+  } catch (error) {
+    console.error("Error marking module complete:", error)
+    return NextResponse.json({ ok: false, error: "failed_to_mark_complete" }, { status: 500 })
+  }
 }

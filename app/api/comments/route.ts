@@ -52,8 +52,8 @@ export async function GET(request: Request) {
       moduleId: c.module_id,
       content: c.content,
       parentId: c.parent_id,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at,
+      createdAt: c.created_at || new Date().toISOString(),
+      updatedAt: c.updated_at || c.created_at || new Date().toISOString(),
       user: c.profiles ? {
         id: c.profiles.id,
         email: c.profiles.email,
@@ -137,8 +137,8 @@ export async function POST(request: Request) {
       moduleId: comment.module_id,
       content: comment.content,
       parentId: comment.parent_id,
-      createdAt: comment.created_at,
-      updatedAt: comment.updated_at,
+      createdAt: comment.created_at || new Date().toISOString(),
+      updatedAt: comment.updated_at || comment.created_at || new Date().toISOString(),
       user: comment.profiles ? {
         id: comment.profiles.id,
         email: comment.profiles.email,

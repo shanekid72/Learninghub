@@ -79,8 +79,8 @@ export async function PUT(
       moduleId: comment.module_id,
       content: comment.content,
       parentId: comment.parent_id,
-      createdAt: comment.created_at,
-      updatedAt: comment.updated_at,
+      createdAt: comment.created_at || new Date().toISOString(),
+      updatedAt: comment.updated_at || comment.created_at || new Date().toISOString(),
       user: comment.profiles ? {
         id: comment.profiles.id,
         email: comment.profiles.email,
