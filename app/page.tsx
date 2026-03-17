@@ -42,6 +42,7 @@ export default function Page() {
   const [email, setEmail] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const emailInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +77,24 @@ export default function Page() {
     }
   };
 
+  const handleTopNavSignIn = async () => {
+    const clean = email.trim().toLowerCase();
+
+    if (clean) {
+      const fakeEvent = { preventDefault() {} } as React.FormEvent;
+      await onSubmit(fakeEvent);
+      return;
+    }
+
+    document
+      .getElementById("get-started")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    window.setTimeout(() => {
+      emailInputRef.current?.focus();
+    }, 250);
+  };
+
   return (
     <main className="min-h-screen bg-black text-white">
       {/* HERO */}
@@ -97,11 +116,8 @@ export default function Page() {
               <option>English</option>
             </select>
             <button
-              onClick={() => {
-                document
-                  .getElementById("get-started")
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }}
+              type="button"
+              onClick={handleTopNavSignIn}
               className="bg-red-600 hover:bg-red-500 px-4 py-2 rounded text-sm font-semibold"
             >
               Sign In
@@ -124,6 +140,7 @@ export default function Page() {
             className="mt-8 w-full max-w-2xl flex flex-col md:flex-row gap-3"
           >
             <input
+              ref={emailInputRef}
               className="flex-1 rounded bg-black/60 border border-white/20 px-4 py-4 outline-none"
               placeholder="Email address"
               value={email}

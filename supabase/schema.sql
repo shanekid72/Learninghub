@@ -334,6 +334,16 @@ CREATE TABLE IF NOT EXISTS public.learning_modules (
   quiz_embed_url TEXT,
   quiz_url TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'youtube')),
+  source_video_id TEXT,
+  source_channel_id TEXT,
+  source_visibility TEXT NOT NULL DEFAULT 'unknown' CHECK (source_visibility IN ('unlisted', 'public', 'private', 'unknown')),
+  source_status TEXT NOT NULL DEFAULT 'active' CHECK (source_status IN ('active', 'removed', 'error')),
+  source_published_at TIMESTAMPTZ,
+  source_imported_at TIMESTAMPTZ,
+  source_synced_at TIMESTAMPTZ,
+  source_reviewed_at TIMESTAMPTZ,
+  source_payload JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_by UUID REFERENCES public.profiles,
@@ -373,6 +383,22 @@ CREATE INDEX IF NOT EXISTS idx_learning_modules_created_by
 CREATE INDEX IF NOT EXISTS idx_learning_modules_updated_by
   ON public.learning_modules(updated_by);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_learning_modules_source_video_id
+  ON public.learning_modules(source_video_id)
+  WHERE source_video_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_learning_modules_source
+  ON public.learning_modules(source);
+
+CREATE INDEX IF NOT EXISTS idx_learning_modules_source_status
+  ON public.learning_modules(source_status);
+
+CREATE INDEX IF NOT EXISTS idx_learning_modules_source_visibility
+  ON public.learning_modules(source_visibility);
+
+CREATE INDEX IF NOT EXISTS idx_learning_modules_source_channel_id
+  ON public.learning_modules(source_channel_id);
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -382,6 +408,49 @@ BEGIN
   ) THEN
     CREATE TRIGGER learning_modules_updated_at
       BEFORE UPDATE ON public.learning_modules
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.youtube_sync_state (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  channel_id TEXT UNIQUE NOT NULL,
+  uploads_playlist_id TEXT NOT NULL,
+  last_checked_at TIMESTAMPTZ,
+  last_success_at TIMESTAMPTZ,
+  last_seen_video_published_at TIMESTAMPTZ,
+  last_error TEXT,
+  last_error_fingerprint TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.youtube_sync_state ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can view youtube sync state" ON public.youtube_sync_state
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can manage youtube sync state" ON public.youtube_sync_state
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger
+    WHERE tgname = 'youtube_sync_state_updated_at'
+  ) THEN
+    CREATE TRIGGER youtube_sync_state_updated_at
+      BEFORE UPDATE ON public.youtube_sync_state
       FOR EACH ROW EXECUTE FUNCTION update_updated_at();
   END IF;
 END $$;

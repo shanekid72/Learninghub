@@ -6,12 +6,18 @@ export const moduleTypeValues = ["VIDEO", "DOC", "SLIDES"] as const
 export const moduleBadgeValues = ["MANDATORY", "NEW", "UPDATED"] as const
 export const quizModeValues = ["none", "internal", "external_embed", "external_link"] as const
 export const internalQuizQuestionTypeValues = ["multiple-choice", "true-false", "multi-select"] as const
+export const moduleSourceValues = ["manual", "youtube"] as const
+export const moduleSourceVisibilityValues = ["unlisted", "public", "private", "unknown"] as const
+export const moduleSourceStatusValues = ["active", "removed", "error"] as const
 
 export type ModuleStatus = (typeof moduleStatusValues)[number]
 export type ModuleType = (typeof moduleTypeValues)[number]
 export type ModuleBadge = (typeof moduleBadgeValues)[number]
 export type QuizMode = (typeof quizModeValues)[number]
 export type InternalQuizQuestionType = (typeof internalQuizQuestionTypeValues)[number]
+export type ModuleSource = (typeof moduleSourceValues)[number]
+export type ModuleSourceVisibility = (typeof moduleSourceVisibilityValues)[number]
+export type ModuleSourceStatus = (typeof moduleSourceStatusValues)[number]
 
 export type LearningModuleRow = Database["public"]["Tables"]["learning_modules"]["Row"]
 export type LearningTeamRow = Database["public"]["Tables"]["learning_teams"]["Row"]
@@ -277,6 +283,16 @@ export function mapModuleRowToAdminModule(module: LearningModuleRow, metrics?: M
     updatedAt: module.updated_at,
     createdBy: module.created_by,
     updatedBy: module.updated_by,
+    source: module.source as ModuleSource,
+    sourceVideoId: module.source_video_id,
+    sourceChannelId: module.source_channel_id,
+    sourceVisibility: module.source_visibility as ModuleSourceVisibility,
+    sourceStatus: module.source_status as ModuleSourceStatus,
+    sourcePublishedAt: module.source_published_at,
+    sourceImportedAt: module.source_imported_at,
+    sourceSyncedAt: module.source_synced_at,
+    sourceReviewedAt: module.source_reviewed_at,
+    sourcePayload: module.source_payload,
     quizMode: module.quiz_mode as QuizMode,
     quizEmbedUrl: module.quiz_embed_url,
     quizUrl: module.quiz_url,

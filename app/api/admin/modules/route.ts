@@ -127,6 +127,9 @@ export async function GET(request: Request) {
     const moduleType = searchParams.get("type")
     const badge = searchParams.get("badge")
     const team = searchParams.get("team")
+    const source = searchParams.get("source")
+    const sourceVisibility = searchParams.get("visibility")
+    const syncStatus = searchParams.get("syncStatus")
     const compact = searchParams.get("compact") === "1"
 
     let query = supabase
@@ -149,6 +152,18 @@ export async function GET(request: Request) {
 
     if (team && team !== "all") {
       query = query.contains("teams", [team])
+    }
+
+    if (source && source !== "all") {
+      query = query.eq("source", source)
+    }
+
+    if (sourceVisibility && sourceVisibility !== "all") {
+      query = query.eq("source_visibility", sourceVisibility)
+    }
+
+    if (syncStatus && syncStatus !== "all") {
+      query = query.eq("source_status", syncStatus)
     }
 
     const { data, error } = await query

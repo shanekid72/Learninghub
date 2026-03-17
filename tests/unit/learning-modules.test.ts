@@ -29,6 +29,16 @@ function createModuleRow(overrides: Partial<LearningModuleRow> = {}): LearningMo
     quiz_mode: "external_embed",
     quiz_embed_url: "https://docs.google.com/forms/d/e/example/viewform?embedded=true",
     quiz_url: null,
+    source: "manual",
+    source_channel_id: null,
+    source_imported_at: null,
+    source_payload: null,
+    source_published_at: null,
+    source_reviewed_at: null,
+    source_status: "active",
+    source_synced_at: null,
+    source_video_id: null,
+    source_visibility: "unknown",
     ...overrides,
   }
 }

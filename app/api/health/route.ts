@@ -9,6 +9,12 @@ export async function GET() {
   const resendConfigured = boolEnv("RESEND_API_KEY")
   const supabaseConfigured = boolEnv("NEXT_PUBLIC_SUPABASE_URL") && boolEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
   const supabaseAdminConfigured = boolEnv("SUPABASE_SERVICE_ROLE_KEY")
+  const youtubeSyncEnabled = ["1", "true", "yes", "on"].includes((process.env.YOUTUBE_SYNC_ENABLED || "").trim().toLowerCase())
+  const youtubeOAuthConfigured =
+    boolEnv("YOUTUBE_CHANNEL_ID") &&
+    boolEnv("YOUTUBE_CLIENT_ID") &&
+    boolEnv("YOUTUBE_CLIENT_SECRET") &&
+    boolEnv("YOUTUBE_REFRESH_TOKEN")
 
   const payload = {
     ok: true,
@@ -24,6 +30,9 @@ export async function GET() {
       smtpConfigured,
       resendConfigured,
       emailConfigured: smtpConfigured || resendConfigured,
+      youtubeSyncEnabled,
+      youtubeChannelId: boolEnv("YOUTUBE_CHANNEL_ID"),
+      youtubeOAuthConfigured,
     },
   }
 

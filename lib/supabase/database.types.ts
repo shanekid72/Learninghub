@@ -143,6 +143,16 @@ export type Database = {
           quiz_mode: string
           quiz_url: string | null
           sort_order: number
+          source: string
+          source_channel_id: string | null
+          source_imported_at: string | null
+          source_payload: Json | null
+          source_published_at: string | null
+          source_reviewed_at: string | null
+          source_status: string
+          source_synced_at: string | null
+          source_video_id: string | null
+          source_visibility: string
           status: string
           teams: string[]
           thumbnail_url: string | null
@@ -166,6 +176,16 @@ export type Database = {
           quiz_mode?: string
           quiz_url?: string | null
           sort_order?: number
+          source?: string
+          source_channel_id?: string | null
+          source_imported_at?: string | null
+          source_payload?: Json | null
+          source_published_at?: string | null
+          source_reviewed_at?: string | null
+          source_status?: string
+          source_synced_at?: string | null
+          source_video_id?: string | null
+          source_visibility?: string
           status?: string
           teams?: string[]
           thumbnail_url?: string | null
@@ -189,6 +209,16 @@ export type Database = {
           quiz_mode?: string
           quiz_url?: string | null
           sort_order?: number
+          source?: string
+          source_channel_id?: string | null
+          source_imported_at?: string | null
+          source_payload?: Json | null
+          source_published_at?: string | null
+          source_reviewed_at?: string | null
+          source_status?: string
+          source_synced_at?: string | null
+          source_video_id?: string | null
+          source_visibility?: string
           status?: string
           teams?: string[]
           thumbnail_url?: string | null
@@ -447,6 +477,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      youtube_sync_state: {
+        Row: {
+          channel_id: string
+          created_at: string
+          id: string
+          last_checked_at: string | null
+          last_error: string | null
+          last_error_fingerprint: string | null
+          last_seen_video_published_at: string | null
+          last_success_at: string | null
+          updated_at: string
+          uploads_playlist_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          id?: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_error_fingerprint?: string | null
+          last_seen_video_published_at?: string | null
+          last_success_at?: string | null
+          updated_at?: string
+          uploads_playlist_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          id?: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_error_fingerprint?: string | null
+          last_seen_video_published_at?: string | null
+          last_success_at?: string | null
+          updated_at?: string
+          uploads_playlist_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {

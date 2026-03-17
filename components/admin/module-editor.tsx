@@ -15,10 +15,25 @@ type ModuleType = "VIDEO" | "DOC" | "SLIDES"
 type ModuleBadge = "MANDATORY" | "NEW" | "UPDATED"
 type QuizMode = "none" | "internal" | "external_embed" | "external_link"
 type QuestionType = "multiple-choice" | "true-false" | "multi-select"
+type ModuleSource = "manual" | "youtube"
+type ModuleSourceVisibility = "unlisted" | "public" | "private" | "unknown"
+type ModuleSourceStatus = "active" | "removed" | "error"
 
 type TeamOption = { id: string; name: string; is_active: boolean; sort_order: number }
 type QuestionOption = { id: string; text: string }
 type QuestionState = { id: string; type: QuestionType; text: string; explanation: string; options: QuestionOption[]; correctAnswers: string[] }
+type ModuleSourceMeta = {
+  source: ModuleSource
+  sourceVideoId: string | null
+  sourceChannelId: string | null
+  sourceVisibility: ModuleSourceVisibility
+  sourceStatus: ModuleSourceStatus
+  sourceImportedAt: string | null
+  sourceSyncedAt: string | null
+  sourceReviewedAt: string | null
+  openUrl: string | null
+}
+
 type ModuleFormState = {
   moduleId: string
   title: string
@@ -34,6 +49,14 @@ type ModuleFormState = {
   teams: string[]
   status: ModuleStatus
   sortOrder: string
+  source: ModuleSource
+  sourceVideoId: string | null
+  sourceChannelId: string | null
+  sourceVisibility: ModuleSourceVisibility
+  sourceStatus: ModuleSourceStatus
+  sourceImportedAt: string | null
+  sourceSyncedAt: string | null
+  sourceReviewedAt: string | null
   quizMode: QuizMode
   quizEmbedUrl: string
   quizUrl: string
@@ -59,6 +82,14 @@ type ModuleDetailResponse = {
     teams: string[]
     status: ModuleStatus
     sortOrder: number
+    source: ModuleSource
+    sourceVideoId: string | null
+    sourceChannelId: string | null
+    sourceVisibility: ModuleSourceVisibility
+    sourceStatus: ModuleSourceStatus
+    sourceImportedAt: string | null
+    sourceSyncedAt: string | null
+    sourceReviewedAt: string | null
     quizMode: QuizMode
     quizEmbedUrl: string | null
     quizUrl: string | null
@@ -126,6 +157,14 @@ function defaultFormState(): ModuleFormState {
     teams: [],
     status: "draft",
     sortOrder: "0",
+    source: "manual",
+    sourceVideoId: null,
+    sourceChannelId: null,
+    sourceVisibility: "unknown",
+    sourceStatus: "active",
+    sourceImportedAt: null,
+    sourceSyncedAt: null,
+    sourceReviewedAt: null,
     quizMode: "none",
     quizEmbedUrl: "",
     quizUrl: "",
@@ -154,6 +193,14 @@ function mapDetailToForm(detail: ModuleDetailResponse, duplicate: boolean): Modu
     teams: detail.module.teams,
     status: duplicate ? "draft" : detail.module.status,
     sortOrder: String(detail.module.sortOrder),
+    source: detail.module.source,
+    sourceVideoId: detail.module.sourceVideoId,
+    sourceChannelId: detail.module.sourceChannelId,
+    sourceVisibility: detail.module.sourceVisibility,
+    sourceStatus: detail.module.sourceStatus,
+    sourceImportedAt: detail.module.sourceImportedAt,
+    sourceSyncedAt: detail.module.sourceSyncedAt,
+    sourceReviewedAt: detail.module.sourceReviewedAt,
     quizMode: detail.module.quizMode,
     quizEmbedUrl: detail.module.quizEmbedUrl || "",
     quizUrl: detail.module.quizUrl || "",
@@ -178,6 +225,7 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
   const [success, setSuccess] = React.useState<string | null>(null)
   const [newTeamName, setNewTeamName] = React.useState("")
   const [hasStoredInternalQuiz, setHasStoredInternalQuiz] = React.useState(false)
+  const [sourceMeta, setSourceMeta] = React.useState<ModuleSourceMeta | null>(null)
 
   React.useEffect(() => {
     let cancelled = false
@@ -203,11 +251,23 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
         if (!cancelled) {
           setForm(mapDetailToForm(detail, mode === "create" && Boolean(duplicateFrom)))
           setHasStoredInternalQuiz(detail.hasStoredInternalQuiz)
+          setSourceMeta(mode === "edit" ? {
+            source: detail.module.source,
+            sourceVideoId: detail.module.sourceVideoId,
+            sourceChannelId: detail.module.sourceChannelId,
+            sourceVisibility: detail.module.sourceVisibility,
+            sourceStatus: detail.module.sourceStatus,
+            sourceImportedAt: detail.module.sourceImportedAt,
+            sourceSyncedAt: detail.module.sourceSyncedAt,
+            sourceReviewedAt: detail.module.sourceReviewedAt,
+            openUrl: detail.module.openUrl,
+          } : null)
           setLoading(false)
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load module")
+          setSourceMeta(null)
           setLoading(false)
         }
       }
@@ -220,6 +280,7 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
   }, [duplicateFrom, mode, moduleId])
 
   const activeTeams = React.useMemo(() => teams.filter((team) => team.is_active).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)), [teams])
+  const isYoutubeModule = sourceMeta?.source === "youtube"
   const setField = <K extends keyof ModuleFormState>(key: K, value: ModuleFormState[K]) => setForm((current) => ({ ...current, [key]: value }))
   const toggleBadge = (badge: ModuleBadge) => setForm((current) => ({ ...current, badges: current.badges.includes(badge) ? current.badges.filter((item) => item !== badge) : [...current.badges, badge] }))
   const toggleTeam = (teamName: string) => setForm((current) => ({ ...current, teams: current.teams.includes(teamName) ? current.teams.filter((item) => item !== teamName) : [...current.teams, teamName] }))
@@ -315,6 +376,17 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
       if (detail.module) {
         setForm(mapDetailToForm(detail, false))
         setHasStoredInternalQuiz(detail.hasStoredInternalQuiz)
+        setSourceMeta({
+          source: detail.module.source,
+          sourceVideoId: detail.module.sourceVideoId,
+          sourceChannelId: detail.module.sourceChannelId,
+          sourceVisibility: detail.module.sourceVisibility,
+          sourceStatus: detail.module.sourceStatus,
+          sourceImportedAt: detail.module.sourceImportedAt,
+          sourceSyncedAt: detail.module.sourceSyncedAt,
+          sourceReviewedAt: detail.module.sourceReviewedAt,
+          openUrl: detail.module.openUrl,
+        })
       }
       setSuccess("Module saved successfully.")
       router.refresh()
@@ -343,21 +415,75 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
       {error && <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
       {success && <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">{success}</div>}
 
+      {isYoutubeModule && sourceMeta ? (
+        <Card className="border-red-900/40 bg-neutral-900">
+          <CardHeader>
+            <CardTitle className="text-white">YouTube Source</CardTitle>
+            <CardDescription className="text-neutral-400">
+              Video metadata is owned by the YouTube sync. Review it here, then add internal metadata before publishing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Source</p>
+              <p className="mt-2 text-sm text-white">{sourceMeta.source}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Visibility</p>
+              <p className="mt-2 text-sm text-white">{sourceMeta.sourceVisibility}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Sync Status</p>
+              <p className="mt-2 text-sm text-white">{sourceMeta.sourceStatus}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Reviewed</p>
+              <p className="mt-2 text-sm text-white">{sourceMeta.sourceReviewedAt ? new Date(sourceMeta.sourceReviewedAt).toLocaleString() : "Not yet reviewed"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Video ID</p>
+              <p className="mt-2 break-all text-sm text-white">{sourceMeta.sourceVideoId || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Channel ID</p>
+              <p className="mt-2 break-all text-sm text-white">{sourceMeta.sourceChannelId || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Imported</p>
+              <p className="mt-2 text-sm text-white">{sourceMeta.sourceImportedAt ? new Date(sourceMeta.sourceImportedAt).toLocaleString() : "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Last Synced</p>
+              <p className="mt-2 text-sm text-white">{sourceMeta.sourceSyncedAt ? new Date(sourceMeta.sourceSyncedAt).toLocaleString() : "—"}</p>
+            </div>
+            {sourceMeta.openUrl ? (
+              <div className="md:col-span-2 xl:col-span-4">
+                <Button asChild variant="outline" className="border-neutral-700 text-neutral-200 hover:bg-neutral-800">
+                  <Link href={sourceMeta.openUrl} target="_blank" rel="noreferrer">
+                    Open on YouTube
+                  </Link>
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="border-neutral-800 bg-neutral-900"><CardHeader><CardTitle className="text-white">Details</CardTitle><CardDescription className="text-neutral-400">Core learner-facing metadata and immutable module ID.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
         <div><label className="mb-2 block text-sm text-neutral-400">Module ID</label><Input value={form.moduleId} onChange={(event) => setField("moduleId", event.target.value)} disabled={mode === "edit"} className="border-neutral-700 bg-neutral-800 text-white" placeholder="e.g. aml-onboarding-001" /></div>
-        <div><label className="mb-2 block text-sm text-neutral-400">Owner</label><Input value={form.owner} onChange={(event) => setField("owner", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" placeholder="e.g. Compliance Team" /></div>
-        <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Title</label><Input value={form.title} onChange={(event) => setField("title", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" /></div>
+        <div><label className="mb-2 block text-sm text-neutral-400">Owner</label><Input value={form.owner} onChange={(event) => setField("owner", event.target.value)} disabled={isYoutubeModule} className="border-neutral-700 bg-neutral-800 text-white disabled:opacity-70" placeholder="e.g. Compliance Team" /></div>
+        <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Title</label><Input value={form.title} onChange={(event) => setField("title", event.target.value)} disabled={isYoutubeModule} className="border-neutral-700 bg-neutral-800 text-white disabled:opacity-70" /></div>
         <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Objective</label><Textarea value={form.objective} onChange={(event) => setField("objective", event.target.value)} className="min-h-[100px] border-neutral-700 bg-neutral-800 text-white" /></div>
-        <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Description</label><Textarea value={form.description} onChange={(event) => setField("description", event.target.value)} className="min-h-[120px] border-neutral-700 bg-neutral-800 text-white" placeholder="Optional long-form description" /></div>
-        <div><label className="mb-2 block text-sm text-neutral-400">Module Type</label><select value={form.moduleType} onChange={(event) => setField("moduleType", event.target.value as ModuleType)} className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-white">{moduleTypes.map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
-        <div><label className="mb-2 block text-sm text-neutral-400">Duration (minutes)</label><Input type="number" min="0" value={form.durationMins} onChange={(event) => setField("durationMins", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" /></div>
+        <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Description</label><Textarea value={form.description} onChange={(event) => setField("description", event.target.value)} disabled={isYoutubeModule} className="min-h-[120px] border-neutral-700 bg-neutral-800 text-white disabled:opacity-70" placeholder="Optional long-form description" /></div>
+        <div><label className="mb-2 block text-sm text-neutral-400">Module Type</label><select value={form.moduleType} onChange={(event) => setField("moduleType", event.target.value as ModuleType)} disabled={isYoutubeModule} className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-white disabled:opacity-70">{moduleTypes.map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
+        <div><label className="mb-2 block text-sm text-neutral-400">Duration (minutes)</label><Input type="number" min="0" value={form.durationMins} onChange={(event) => setField("durationMins", event.target.value)} disabled={isYoutubeModule} className="border-neutral-700 bg-neutral-800 text-white disabled:opacity-70" /></div>
         <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Badges</label><div className="flex flex-wrap gap-2">{badgeOptions.map((badge) => { const selected = form.badges.includes(badge); return <button key={badge} type="button" onClick={() => toggleBadge(badge)} className={`rounded-full border px-3 py-1 text-sm transition-colors ${selected ? "border-emerald-500 bg-emerald-500/10 text-emerald-300" : "border-neutral-700 bg-neutral-950 text-neutral-300 hover:border-neutral-500"}`}>{badge}</button> })}</div></div>
       </CardContent></Card>
 
       <Card className="border-neutral-800 bg-neutral-900"><CardHeader><CardTitle className="text-white">Content</CardTitle><CardDescription className="text-neutral-400">URL-based content delivery for video, documents, or slides.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
-        <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Content Embed URL</label><Input value={form.contentEmbedUrl} onChange={(event) => setField("contentEmbedUrl", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" placeholder="https://www.youtube.com/embed/..." /></div>
-        <div><label className="mb-2 block text-sm text-neutral-400">Open URL</label><Input value={form.openUrl} onChange={(event) => setField("openUrl", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" placeholder="Optional external link" /></div>
-        <div><label className="mb-2 block text-sm text-neutral-400">Thumbnail URL</label><Input value={form.thumbnailUrl} onChange={(event) => setField("thumbnailUrl", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" placeholder="Optional image preview" /></div>
+        <div className="md:col-span-2"><label className="mb-2 block text-sm text-neutral-400">Content Embed URL</label><Input value={form.contentEmbedUrl} onChange={(event) => setField("contentEmbedUrl", event.target.value)} disabled={isYoutubeModule} className="border-neutral-700 bg-neutral-800 text-white disabled:opacity-70" placeholder="https://www.youtube.com/embed/..." /></div>
+        <div><label className="mb-2 block text-sm text-neutral-400">Open URL</label><Input value={form.openUrl} onChange={(event) => setField("openUrl", event.target.value)} disabled={isYoutubeModule} className="border-neutral-700 bg-neutral-800 text-white disabled:opacity-70" placeholder="Optional external link" /></div>
+        <div><label className="mb-2 block text-sm text-neutral-400">Thumbnail URL</label><Input value={form.thumbnailUrl} onChange={(event) => setField("thumbnailUrl", event.target.value)} disabled={isYoutubeModule} className="border-neutral-700 bg-neutral-800 text-white disabled:opacity-70" placeholder="Optional image preview" /></div>
       </CardContent></Card>
       <Card className="border-neutral-800 bg-neutral-900"><CardHeader><CardTitle className="text-white">Audience Metadata</CardTitle><CardDescription className="text-neutral-400">Team taxonomy is stored in Supabase and can be extended inline.</CardDescription></CardHeader><CardContent className="space-y-4">
         <div className="grid gap-3 md:grid-cols-[2fr_auto]">

@@ -4,6 +4,10 @@ import { buildWelcomeEmail } from './email-templates/welcome'
 import { buildCompletionEmail } from './email-templates/completion'
 import { buildReminderEmail } from './email-templates/reminder'
 import { buildUpdateEmail } from './email-templates/update'
+import {
+  buildYoutubeSyncFailureEmail,
+  buildYoutubeSyncSummaryEmail,
+} from './email-templates/youtube-sync'
 
 let resendClient: Resend | null = null
 let smtpClient: Transporter | null = null
@@ -80,7 +84,14 @@ function getProviderOrder(): EmailProvider[] {
   return providers
 }
 
-export type EmailType = 'welcome' | 'completion' | 'reminder' | 'certificate' | 'update'
+export type EmailType =
+  | 'welcome'
+  | 'completion'
+  | 'reminder'
+  | 'certificate'
+  | 'update'
+  | 'youtube_sync_summary'
+  | 'youtube_sync_failure'
 
 interface SendEmailParams {
   to: string
@@ -142,6 +153,27 @@ export async function sendEmail({ to, type, data }: SendEmailParams) {
           dueDate: data.dueDate as string | undefined,
           note: data.note as string | undefined,
           hubUrl: data.hubUrl as string,
+        })
+        break
+
+      case 'youtube_sync_summary':
+        subject = (data.subject as string) || 'New YouTube videos imported into Learning Hub'
+        html = buildYoutubeSyncSummaryEmail({
+          userName: data.userName as string,
+          importedCount: Number(data.importedCount || 0),
+          importedVideos: (data.importedVideos as Array<{ title: string; moduleId: string }>) || [],
+          adminUrl: data.adminUrl as string,
+          channelId: data.channelId as string,
+        })
+        break
+
+      case 'youtube_sync_failure':
+        subject = (data.subject as string) || 'Learning Hub YouTube sync failed'
+        html = buildYoutubeSyncFailureEmail({
+          userName: data.userName as string,
+          errorMessage: data.errorMessage as string,
+          channelId: data.channelId as string,
+          adminUrl: data.adminUrl as string,
         })
         break
 

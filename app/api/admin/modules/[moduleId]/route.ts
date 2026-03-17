@@ -130,19 +130,31 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     await ensureLearningTeamsExist(parsed.data.teams)
     const supabase = await createAdminClient()
+    const { data: existingModule, error: existingModuleError } = await supabase
+      .from("learning_modules")
+      .select("*")
+      .eq("module_id", moduleId)
+      .maybeSingle()
+
+    if (existingModuleError) throw existingModuleError
+    if (!existingModule) {
+      return NextResponse.json({ error: "Module not found" }, { status: 404 })
+    }
+
+    const isYoutubeModule = existingModule.source === "youtube"
 
     const { data: module, error } = await supabase
       .from("learning_modules")
       .update({
-        title: parsed.data.title,
+        title: isYoutubeModule ? existingModule.title : parsed.data.title,
         objective: parsed.data.objective,
-        description: parsed.data.description,
-        module_type: parsed.data.moduleType,
-        duration_mins: parsed.data.durationMins,
-        content_embed_url: parsed.data.contentEmbedUrl,
-        open_url: parsed.data.openUrl,
-        thumbnail_url: parsed.data.thumbnailUrl,
-        owner: parsed.data.owner,
+        description: isYoutubeModule ? existingModule.description : parsed.data.description,
+        module_type: isYoutubeModule ? existingModule.module_type : parsed.data.moduleType,
+        duration_mins: isYoutubeModule ? existingModule.duration_mins : parsed.data.durationMins,
+        content_embed_url: isYoutubeModule ? existingModule.content_embed_url : parsed.data.contentEmbedUrl,
+        open_url: isYoutubeModule ? existingModule.open_url : parsed.data.openUrl,
+        thumbnail_url: isYoutubeModule ? existingModule.thumbnail_url : parsed.data.thumbnailUrl,
+        owner: isYoutubeModule ? existingModule.owner : parsed.data.owner,
         badges: parsed.data.badges,
         teams: parsed.data.teams,
         status: parsed.data.status,
@@ -151,6 +163,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         quiz_embed_url: parsed.data.quizEmbedUrl,
         quiz_url: parsed.data.quizUrl,
         updated_by: admin.profile.id,
+        source_reviewed_at:
+          isYoutubeModule && !existingModule.source_reviewed_at
+            ? new Date().toISOString()
+            : existingModule.source_reviewed_at,
       })
       .eq("module_id", moduleId)
       .select("*")

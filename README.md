@@ -114,6 +114,11 @@ pnpm test:e2e
   - Check `SUPABASE_SERVICE_ROLE_KEY` and seeded `learning_modules` rows
 - Email sending fails:
   - Check Gmail SMTP vars (`SMTP_USER`, `SMTP_APP_PASSWORD`, `EMAIL_FROM`) or `RESEND_API_KEY`
+- YouTube sync does not import videos:
+  - Confirm `YOUTUBE_SYNC_ENABLED=true`
+  - Confirm `YOUTUBE_CHANNEL_ID`, `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN`
+  - Verify the channel owner OAuth token can access the channel uploads playlist
+  - Only `unlisted` and embeddable videos are imported in v1
 
 ## Release
 
@@ -126,11 +131,50 @@ Owner responsibilities by phase are in [`docs/PHASE_TASKS.md`](docs/PHASE_TASKS.
 ## Health Check
 
 - `GET /api/health` returns service status and environment check flags.
+- Includes YouTube sync readiness flags:
+  - `youtubeSyncEnabled`
+  - `youtubeChannelId`
+  - `youtubeOAuthConfigured`
 
 ## Update Automation
 
 - Admin update publish endpoint: `POST /api/admin/updates/publish`
 - Cron reminder endpoint: `GET|POST /api/cron/assignment-reminders` (requires `CRON_SECRET`)
+
+## YouTube Unlisted Sync
+
+LearningHub can import unlisted YouTube uploads from one configured channel into `Admin -> Modules` as draft modules.
+
+### Required environment variables
+
+- `YOUTUBE_SYNC_ENABLED=true`
+- `YOUTUBE_CHANNEL_ID=<your youtube channel id>`
+- `YOUTUBE_CLIENT_ID=<google oauth client id>`
+- `YOUTUBE_CLIENT_SECRET=<google oauth client secret>`
+- `YOUTUBE_REFRESH_TOKEN=<refresh token for the channel owner account>`
+- `YOUTUBE_SYNC_LOOKBACK_HOURS=168`
+
+### Behavior
+
+- Only `unlisted` and embeddable videos are imported
+- Imported videos become `draft` modules with IDs like `yt_<videoId>`
+- YouTube owns title/description/thumbnail/duration/video URLs
+- Admin owns objective/badges/teams/status/quiz metadata
+- New imports notify all admin users by email
+- Repeated identical sync failures are deduplicated to avoid alert spam
+
+### Routes
+
+- Admin manual sync: `POST /api/admin/youtube/sync`
+- Admin sync status: `GET /api/admin/youtube/sync/status`
+- Cron sync: `GET /api/cron/youtube-sync` (requires `CRON_SECRET`)
+
+### Vercel cron
+
+`vercel.json` includes:
+
+- `/api/cron/assignment-reminders` daily
+- `/api/cron/youtube-sync` every 15 minutes
 
 ## LH Compatibility Upstream
 
