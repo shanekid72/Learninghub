@@ -174,7 +174,13 @@ LearningHub can import unlisted YouTube uploads from one configured channel into
 `vercel.json` includes:
 
 - `/api/cron/assignment-reminders` daily
-- `/api/cron/youtube-sync` every 15 minutes
+
+For YouTube sync on Vercel Hobby:
+
+- use the admin manual sync action from `Admin -> Modules`
+- or trigger `GET /api/cron/youtube-sync` from an external scheduler
+
+The built-in 15-minute YouTube cron is only suitable for Vercel Pro and above.
 
 ## LH Compatibility Upstream
 
