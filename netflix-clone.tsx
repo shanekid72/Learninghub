@@ -259,6 +259,29 @@ export default function LearningHub() {
     return <Rail key={title} title={title} items={items} onOpen={openModule} onToggleSaved={toggleSaved} />
   }
 
+  const renderGrid = (title: string, items: Module[], emptyMessage: string) => (
+    <section className="mb-10 px-4 md:px-16">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-lg md:text-xl font-semibold text-white">{title}</h2>
+        <span className="text-sm text-neutral-500">{items.length} modules</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="py-12 text-center text-neutral-500">{emptyMessage}</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {items.map((mod) => (
+            <ModuleCard
+              key={mod.id}
+              module={mod}
+              onOpen={openModule}
+              onToggleSaved={toggleSaved}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+
   const renderPageContent = () => {
     switch (activePage) {
       case "my-learning":
@@ -452,6 +475,7 @@ export default function LearningHub() {
 
             {/* Rails */}
             <main className="relative z-10 -mt-16 pb-20">
+              {renderGrid("All Published Modules", modules, "No published modules are available right now.")}
               {renderRail("Continue Learning", continueLearning)}
               {renderRail("Assigned to You", assigned)}
               {renderRail("New Hire Essentials", newHireEssentials)}
