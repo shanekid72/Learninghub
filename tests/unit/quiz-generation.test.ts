@@ -9,6 +9,15 @@ describe("quiz generation helpers", () => {
     expect(__internal.determineQuestionCount(35)).toBe(5)
   })
 
+  it("requires substantial source notes when transcript is unavailable", () => {
+    expect(__internal.hasSufficientQuizSourceNotes("too short")).toBe(false)
+    expect(
+      __internal.hasSufficientQuizSourceNotes(
+        Array.from({ length: 80 }, (_, index) => `word${index + 1}`).join(" "),
+      ),
+    ).toBe(true)
+  })
+
   it("normalizes generated quiz output into stored internal quiz shape", () => {
     const quiz = __internal.normalizeQuiz({
       title: "RaaS Knowledge Check",

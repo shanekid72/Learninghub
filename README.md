@@ -201,7 +201,7 @@ LearningHub can generate internal quiz drafts inside the module editor.
 
 - Quiz drafts are generated only when an admin clicks `Generate Quiz Draft`
 - For synced YouTube modules, LearningHub first tries to extract captions/transcript text
-- If no transcript is available, generation falls back to module metadata and admin notes
+- If no transcript is available, admins must provide at least 80 words of source notes or transcript text before a draft can be generated
 - Cost is constrained by low-cost defaults: `gpt-5-mini`, a capped transcript window, capped admin-note input, and a 3-5 question draft size
 - Generated drafts are not auto-saved; admins review and save them in the existing quiz editor
 - Certificates are available only for modules with an internal quiz and a passed quiz attempt

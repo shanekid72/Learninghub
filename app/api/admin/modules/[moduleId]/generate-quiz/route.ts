@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireAdminProfile } from "@/lib/admin-auth"
 import { createAdminClient } from "@/lib/supabase/server"
-import { generateQuizDraft } from "@/lib/quiz-generation"
+import { generateQuizDraft, hasSufficientQuizSourceNotes } from "@/lib/quiz-generation"
 import { fetchYoutubeTranscript, normalizeYoutubeVideoId } from "@/lib/youtube-transcript"
 
 type RouteParams = { params: Promise<{ moduleId: string }> }
@@ -84,8 +84,18 @@ export async function POST(request: Request, { params }: RouteParams) {
           warnings.push(transcriptResult.warning)
         }
       } else {
-        warnings.push("This module does not expose a YouTube video reference, so quiz generation used metadata only.")
+        warnings.push("This module does not expose a usable YouTube video reference.")
       }
+    }
+
+    if (!transcript && !hasSufficientQuizSourceNotes(merged.generationNotes)) {
+      return NextResponse.json(
+        {
+          error:
+            "No usable transcript was found. Paste at least 80 words of source notes or transcript text into Generation Notes / Transcript Override, then try again.",
+        },
+        { status: 400 },
+      )
     }
 
     const result = await generateQuizDraft({
@@ -102,7 +112,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       generationNotes: merged.generationNotes,
       sourceSummary: transcript
         ? `YouTube captions transcript${transcriptLanguage ? ` (${transcriptLanguage})` : ""} plus module metadata`
-        : "module metadata and admin notes",
+        : "admin-provided source notes plus module metadata",
     })
 
     return NextResponse.json({

@@ -587,7 +587,7 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-medium text-white">AI Quiz Draft</p>
-                <p className="text-sm text-neutral-400">Generate an internal quiz draft from the synced YouTube transcript when available, otherwise from the current module metadata.</p>
+                <p className="text-sm text-neutral-400">Generate an internal quiz draft from the synced YouTube transcript when available. If captions are missing, provide source notes or transcript text below before generating.</p>
               </div>
               <Button type="button" variant="outline" className="border-neutral-700 text-neutral-200 hover:bg-neutral-800" onClick={handleGenerateQuiz} disabled={generatingQuiz}>
                 {generatingQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -596,7 +596,7 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
             </div>
             <div>
               <label className="mb-2 block text-sm text-neutral-400">Generation Notes / Transcript Override</label>
-              <Textarea value={quizGenerationNotes} onChange={(event) => setQuizGenerationNotes(event.target.value)} className="min-h-[110px] border-neutral-700 bg-neutral-800 text-white" placeholder="Optional. Paste a transcript excerpt, key learning points, or instructions to steer the generated draft." />
+              <Textarea value={quizGenerationNotes} onChange={(event) => setQuizGenerationNotes(event.target.value)} className="min-h-[110px] border-neutral-700 bg-neutral-800 text-white" placeholder="If the video has no captions, paste at least 80 words of transcript, summary, or key learning notes here." />
             </div>
           </div>
         )}

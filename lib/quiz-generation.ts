@@ -90,6 +90,7 @@ const JSON_SCHEMA = {
 const QUIZ_DRAFT_LIMITS = {
   transcriptChars: 12000,
   generationNotesChars: 1200,
+  minimumGenerationNoteWords: 80,
   titleChars: 160,
   objectiveChars: 500,
   descriptionChars: 900,
@@ -117,6 +118,18 @@ function determineQuestionCount(durationMins: number): number {
 function trimForPrompt(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value
   return `${value.slice(0, maxLength)}\n\n[truncated]`
+}
+
+function countWords(value: string | null | undefined): number {
+  if (!value) return 0
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
+export function hasSufficientQuizSourceNotes(value: string | null | undefined): boolean {
+  return countWords(value) >= QUIZ_DRAFT_LIMITS.minimumGenerationNoteWords
 }
 
 function buildPrompt(context: QuizGenerationContext): string {
@@ -210,7 +223,9 @@ function normalizeQuiz(payload: GeneratedQuizSchema): InternalQuizInput {
 }
 
 export const __internal = {
+  countWords,
   determineQuestionCount,
+  hasSufficientQuizSourceNotes,
   limits: QUIZ_DRAFT_LIMITS,
   normalizeQuiz,
 }
