@@ -13,6 +13,7 @@ export interface QuizQuestionBase {
 
 export interface StoredQuizQuestion extends QuizQuestionBase {
   correctAnswers: string[]
+  variantGroup?: string | null
 }
 
 export type PublicQuizQuestion = QuizQuestionBase

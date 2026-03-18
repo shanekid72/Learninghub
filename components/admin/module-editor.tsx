@@ -21,7 +21,7 @@ type ModuleSourceStatus = "active" | "removed" | "error"
 
 type TeamOption = { id: string; name: string; is_active: boolean; sort_order: number }
 type QuestionOption = { id: string; text: string }
-type QuestionState = { id: string; type: QuestionType; text: string; explanation: string; options: QuestionOption[]; correctAnswers: string[] }
+type QuestionState = { id: string; type: QuestionType; text: string; explanation: string; options: QuestionOption[]; correctAnswers: string[]; variantGroup: string }
 type ModuleSourceMeta = {
   source: ModuleSource
   sourceVideoId: string | null
@@ -97,7 +97,7 @@ type ModuleDetailResponse = {
   quiz: {
     title: string
     passingScore: number
-    questions: Array<{ id: string; type: QuestionType; text: string; options: QuestionOption[]; correctAnswers: string[]; explanation?: string }>
+    questions: Array<{ id: string; type: QuestionType; text: string; options: QuestionOption[]; correctAnswers: string[]; explanation?: string; variantGroup?: string | null }>
   } | null
   hasStoredInternalQuiz: boolean
 }
@@ -139,7 +139,7 @@ function trueFalseOptions(): QuestionOption[] {
 
 function createQuestion(type: QuestionType = "multiple-choice"): QuestionState {
   if (type === "true-false") {
-    return { id: makeId("q"), type, text: "", explanation: "", options: trueFalseOptions(), correctAnswers: ["true"] }
+    return { id: makeId("q"), type, text: "", explanation: "", options: trueFalseOptions(), correctAnswers: ["true"], variantGroup: "" }
   }
 
   const firstId = makeId("o")
@@ -151,6 +151,7 @@ function createQuestion(type: QuestionType = "multiple-choice"): QuestionState {
     explanation: "",
     options: [{ id: firstId, text: "" }, { id: secondId, text: "" }],
     correctAnswers: [firstId],
+    variantGroup: "",
   }
 }
 
@@ -219,7 +220,7 @@ function mapDetailToForm(detail: ModuleDetailResponse, duplicate: boolean): Modu
     quizUrl: detail.module.quizUrl || "",
     quizTitle: detail.quiz?.title || detail.module.title,
     quizPassingScore: String(detail.quiz?.passingScore ?? 80),
-    questions: detail.quiz?.questions?.length ? detail.quiz.questions.map((q) => ({ id: q.id, type: q.type, text: q.text, explanation: q.explanation || "", options: q.options, correctAnswers: q.correctAnswers })) : fallback.questions,
+    questions: detail.quiz?.questions?.length ? detail.quiz.questions.map((q) => ({ id: q.id, type: q.type, text: q.text, explanation: q.explanation || "", options: q.options, correctAnswers: q.correctAnswers, variantGroup: q.variantGroup || "" })) : fallback.questions,
     removeInternalQuiz: false,
   }
 }
@@ -440,7 +441,7 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
         quizMode: form.quizMode,
         quizEmbedUrl: form.quizEmbedUrl.trim() || null,
         quizUrl: form.quizUrl.trim() || null,
-        quiz: form.quizMode === "internal" ? { title: form.quizTitle.trim() || form.title.trim(), passingScore: Number(form.quizPassingScore), questions: form.questions.map((question) => ({ id: question.id, type: question.type, text: question.text.trim(), explanation: question.explanation.trim() || undefined, options: question.options.map((option) => ({ id: option.id, text: option.text.trim() })), correctAnswers: question.correctAnswers })) } : null,
+        quiz: form.quizMode === "internal" ? { title: form.quizTitle.trim() || form.title.trim(), passingScore: Number(form.quizPassingScore), questions: form.questions.map((question) => ({ id: question.id, type: question.type, text: question.text.trim(), explanation: question.explanation.trim() || undefined, variantGroup: question.variantGroup.trim() || undefined, options: question.options.map((option) => ({ id: option.id, text: option.text.trim() })), correctAnswers: question.correctAnswers })) } : null,
         removeInternalQuiz: form.removeInternalQuiz,
       }
 
@@ -617,6 +618,15 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
             </div>
             <div className="mt-4 grid gap-4">
               <div><label className="mb-2 block text-sm text-neutral-400">Question Text</label><Textarea value={question.text} onChange={(event) => updateQuestion(question.id, (current) => ({ ...current, text: event.target.value }))} className="min-h-[90px] border-neutral-700 bg-neutral-800 text-white" /></div>
+              <div>
+                <label className="mb-2 block text-sm text-neutral-400">Variant Group (optional)</label>
+                <Input
+                  value={question.variantGroup}
+                  onChange={(event) => updateQuestion(question.id, (current) => ({ ...current, variantGroup: event.target.value }))}
+                  className="border-neutral-700 bg-neutral-800 text-white"
+                  placeholder="Questions with the same group become alternatives; each learner gets one."
+                />
+              </div>
               <div><label className="mb-2 block text-sm text-neutral-400">Explanation (optional)</label><Textarea value={question.explanation} onChange={(event) => updateQuestion(question.id, (current) => ({ ...current, explanation: event.target.value }))} className="min-h-[80px] border-neutral-700 bg-neutral-800 text-white" /></div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between"><label className="block text-sm text-neutral-400">Options</label>{question.type !== "true-false" && <Button type="button" variant="outline" size="sm" className="border-neutral-700 text-neutral-200 hover:bg-neutral-800" onClick={() => addOption(question.id)}><Plus className="mr-2 h-4 w-4" />Add Option</Button>}</div>

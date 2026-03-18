@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { getSessionContext } from "@/lib/app-session"
 import { createAdminClient } from "@/lib/supabase/server"
-import { PublicQuizQuestion, Quiz, StoredQuizQuestion } from "@/lib/quiz-types"
+import { Quiz, StoredQuizQuestion } from "@/lib/quiz-types"
+import { personalizeQuizForLearner } from "@/lib/quiz-rotation"
 
 export async function GET(
   request: Request,
@@ -43,16 +44,17 @@ export async function GET(
       throw error
     }
 
-    const publicQuestions = (quiz.questions as unknown as StoredQuizQuestion[]).map((question) => {
-      const { correctAnswers: _correctAnswers, ...safeQuestion } = question
-      return safeQuestion as PublicQuizQuestion
-    })
+    const personalizedQuestions = personalizeQuizForLearner(
+      quiz.id,
+      session.profile.id,
+      quiz.questions as unknown as StoredQuizQuestion[],
+    )
 
     const formattedQuiz: Quiz = {
       id: quiz.id,
       moduleId: quiz.module_id,
       title: quiz.title,
-      questions: publicQuestions,
+      questions: personalizedQuestions,
       passingScore: quiz.passing_score ?? 70,
       createdAt: quiz.created_at || undefined
     }

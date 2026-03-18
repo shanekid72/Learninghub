@@ -37,6 +37,7 @@ export type InternalQuizQuestionInput = {
   options: InternalQuizOptionInput[]
   correctAnswers: string[]
   explanation?: string
+  variantGroup?: string | null
 }
 
 export type InternalQuizInput = {
@@ -103,6 +104,7 @@ const quizQuestionSchema = z.object({
   options: z.array(quizOptionSchema).min(2).max(8),
   correctAnswers: z.array(z.string().trim().min(1).max(80)).min(1).max(8),
   explanation: optionalTrimmedString,
+  variantGroup: optionalTrimmedString,
 }).superRefine((question, ctx) => {
   const optionIds = question.options.map((option) => option.id)
   const uniqueOptionIds = new Set(optionIds)
@@ -137,6 +139,14 @@ const quizQuestionSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "This question type accepts exactly one correct answer",
       path: ["correctAnswers"],
+    })
+  }
+
+  if (question.variantGroup && question.variantGroup.length > 80) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Variant group must be 80 characters or fewer",
+      path: ["variantGroup"],
     })
   }
 })

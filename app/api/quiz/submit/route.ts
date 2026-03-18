@@ -5,6 +5,7 @@ import { QuizSubmission, StoredQuizQuestion } from "@/lib/quiz-types"
 import { z } from "zod"
 import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
 import { scoreQuizSubmission } from "@/lib/quiz-scoring"
+import { selectQuizQuestionsForLearner } from "@/lib/quiz-rotation"
 
 const submissionSchema = z.object({
   quizId: z.string().uuid(),
@@ -63,7 +64,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Quiz not found" }, { status: 404 })
     }
 
-    const questions = quiz.questions as unknown as StoredQuizQuestion[]
+    const questions = selectQuizQuestionsForLearner(
+      quiz.id,
+      session.profile.id,
+      quiz.questions as unknown as StoredQuizQuestion[],
+    )
+
     const result = scoreQuizSubmission(questions, submission.answers, quiz.passing_score ?? 70)
 
     const { error: attemptError } = await supabase
