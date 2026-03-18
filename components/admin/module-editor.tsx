@@ -102,6 +102,19 @@ type ModuleDetailResponse = {
   hasStoredInternalQuiz: boolean
 }
 
+type QuizGenerationResponse = {
+  quiz: {
+    title: string
+    passingScore: number
+    questions: QuestionState[]
+  }
+  contextSource: "transcript+metadata" | "metadata"
+  transcriptUsed: boolean
+  transcriptLanguage: string | null
+  warnings: string[]
+  model: string
+}
+
 const moduleTypes: ModuleType[] = ["VIDEO", "DOC", "SLIDES"]
 const badgeOptions: ModuleBadge[] = ["MANDATORY", "NEW", "UPDATED"]
 const quizModes: Array<{ value: QuizMode; label: string }> = [
@@ -221,9 +234,11 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
   const [loading, setLoading] = React.useState(mode === "edit" || Boolean(duplicateFrom))
   const [saving, setSaving] = React.useState(false)
   const [addingTeam, setAddingTeam] = React.useState(false)
+  const [generatingQuiz, setGeneratingQuiz] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
   const [newTeamName, setNewTeamName] = React.useState("")
+  const [quizGenerationNotes, setQuizGenerationNotes] = React.useState("")
   const [hasStoredInternalQuiz, setHasStoredInternalQuiz] = React.useState(false)
   const [sourceMeta, setSourceMeta] = React.useState<ModuleSourceMeta | null>(null)
 
@@ -328,6 +343,77 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
       setError(err instanceof Error ? err.message : "Failed to create team")
     } finally {
       setAddingTeam(false)
+    }
+  }
+
+  const handleGenerateQuiz = async () => {
+    const generationTargetId = mode === "edit" ? moduleId : duplicateFrom
+    if (!generationTargetId) {
+      setError("Save the module once before generating a quiz draft.")
+      return
+    }
+
+    const hasDraftWork =
+      form.quizMode === "internal" &&
+      form.questions.some((question) =>
+        question.text.trim() ||
+        question.explanation.trim() ||
+        question.options.some((option) => option.text.trim()),
+      )
+
+    if (hasDraftWork && typeof window !== "undefined") {
+      const shouldReplace = window.confirm("Generate a new quiz draft and replace the current unsaved quiz questions?")
+      if (!shouldReplace) return
+    }
+
+    setGeneratingQuiz(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch(`/api/admin/modules/${encodeURIComponent(generationTargetId)}/generate-quiz`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          objective: form.objective.trim(),
+          description: form.description.trim() || null,
+          owner: form.owner.trim(),
+          durationMins: Number(form.durationMins),
+          moduleType: form.moduleType,
+          teams: form.teams,
+          badges: form.badges,
+          openUrl: form.openUrl.trim() || null,
+          contentEmbedUrl: form.contentEmbedUrl.trim() || null,
+          source: form.source,
+          sourceVideoId: form.sourceVideoId,
+          generationNotes: quizGenerationNotes.trim() || null,
+        }),
+      })
+
+      const payload = (await response.json().catch(() => ({}))) as QuizGenerationResponse & { error?: string }
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to generate quiz draft")
+      }
+
+      setForm((current) => ({
+        ...current,
+        quizMode: "internal",
+        quizTitle: payload.quiz.title,
+        quizPassingScore: String(payload.quiz.passingScore),
+        questions: payload.quiz.questions,
+        removeInternalQuiz: false,
+      }))
+
+      const contextMessage = payload.transcriptUsed
+        ? `Quiz draft generated from transcript${payload.transcriptLanguage ? ` (${payload.transcriptLanguage})` : ""}.`
+        : "Quiz draft generated from metadata because no transcript was available."
+      const warningMessage = payload.warnings.length ? ` ${payload.warnings.join(" ")}` : ""
+      setSuccess(`${contextMessage} Review the questions before saving.${warningMessage}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate quiz draft")
+    } finally {
+      setGeneratingQuiz(false)
     }
   }
 
@@ -496,6 +582,24 @@ export function ModuleEditor({ mode, moduleId }: { mode: "create" | "edit"; modu
 
       <Card className="border-neutral-800 bg-neutral-900"><CardHeader><CardTitle className="text-white">Quiz</CardTitle><CardDescription className="text-neutral-400">Internal quiz authoring plus external embed/link compatibility.</CardDescription></CardHeader><CardContent className="space-y-4">
         <div><label className="mb-2 block text-sm text-neutral-400">Quiz Mode</label><select value={form.quizMode} onChange={(event) => setField("quizMode", event.target.value as QuizMode)} className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-white">{quizModes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+        {(mode === "edit" || Boolean(duplicateFrom)) && (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-950/40 p-4 space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">AI Quiz Draft</p>
+                <p className="text-sm text-neutral-400">Generate an internal quiz draft from the synced YouTube transcript when available, otherwise from the current module metadata.</p>
+              </div>
+              <Button type="button" variant="outline" className="border-neutral-700 text-neutral-200 hover:bg-neutral-800" onClick={handleGenerateQuiz} disabled={generatingQuiz}>
+                {generatingQuiz ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Generate Quiz Draft
+              </Button>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-neutral-400">Generation Notes / Transcript Override</label>
+              <Textarea value={quizGenerationNotes} onChange={(event) => setQuizGenerationNotes(event.target.value)} className="min-h-[110px] border-neutral-700 bg-neutral-800 text-white" placeholder="Optional. Paste a transcript excerpt, key learning points, or instructions to steer the generated draft." />
+            </div>
+          </div>
+        )}
         {form.quizMode === "external_embed" && <div><label className="mb-2 block text-sm text-neutral-400">Quiz Embed URL</label><Input value={form.quizEmbedUrl} onChange={(event) => setField("quizEmbedUrl", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" placeholder="https://docs.google.com/forms/.../viewform?embedded=true" /></div>}
         {form.quizMode === "external_link" && <div><label className="mb-2 block text-sm text-neutral-400">Quiz URL</label><Input value={form.quizUrl} onChange={(event) => setField("quizUrl", event.target.value)} className="border-neutral-700 bg-neutral-800 text-white" placeholder="https://forms.gle/..." /></div>}
         {form.quizMode === "internal" && <div className="space-y-6 rounded-lg border border-neutral-800 bg-neutral-950/40 p-4">

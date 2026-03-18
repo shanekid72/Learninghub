@@ -16,7 +16,7 @@ export interface LHModule {
     badges: string
     teams: string
     sort_order: number
-    quiz_mode?: string | null
+    quiz_mode?: "none" | "internal" | "external_embed" | "external_link" | null
     quiz_embed_url?: string | null
     quiz_url?: string | null
     assigned?: boolean

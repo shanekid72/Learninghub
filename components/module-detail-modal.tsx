@@ -24,8 +24,10 @@ import { CertificateDownload } from "./certificate/certificate-download"
 import type { Module } from "@/lib/module-types"
 import type { Quiz, QuizResult } from "@/lib/quiz-types"
 import { trackModuleView, trackQuizComplete, trackQuizStart } from "@/lib/analytics"
+import type { ModuleQuizMode } from "@/lib/module-types"
 
 type TabType = "content" | "quiz" | "comments"
+type QuizPayload = Quiz & { userHasPassed?: boolean }
 
 interface ModuleDetailModalProps {
   isOpen: boolean
@@ -83,8 +85,9 @@ export function ModuleDetailModal({
     try {
       const response = await fetch(`/api/quiz/${moduleId}`)
       if (response.ok) {
-        const quiz = await response.json()
+        const quiz = (await response.json()) as QuizPayload
         setSupabaseQuiz(quiz)
+        setQuizPassed(Boolean(quiz.userHasPassed))
       }
     } catch (error) {
       console.error('Failed to fetch quiz:', error)
@@ -116,6 +119,7 @@ export function ModuleDetailModal({
     )
 
   const hasQuiz = !!module.quizEmbedUrl || !!module.quizUrl || !!supabaseQuiz
+  const requiresInternalQuiz = (module.quizMode as ModuleQuizMode | undefined) === "internal"
   const hasComments = true
 
   return (
@@ -353,7 +357,8 @@ export function ModuleDetailModal({
                   moduleId={String(module.id)}
                   moduleTitle={module.title}
                   isCompleted={module.progress === 100}
-                  quizPassed={!supabaseQuiz || quizPassed}
+                  requiresInternalQuiz={requiresInternalQuiz}
+                  quizPassed={quizPassed}
                 />
               </div>
             )}

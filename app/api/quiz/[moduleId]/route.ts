@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const session = await getSessionContext()
-    if (!session) {
+    if (!session?.profile) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -57,7 +57,23 @@ export async function GET(
       createdAt: quiz.created_at || undefined
     }
 
-    return NextResponse.json(formattedQuiz)
+    const { data: passingAttempt, error: passingAttemptError } = await supabase
+      .from("quiz_attempts")
+      .select("id")
+      .eq("quiz_id", quiz.id)
+      .eq("user_id", session.profile.id)
+      .eq("passed", true)
+      .limit(1)
+      .maybeSingle()
+
+    if (passingAttemptError && passingAttemptError.code !== "PGRST116") {
+      throw passingAttemptError
+    }
+
+    return NextResponse.json({
+      ...formattedQuiz,
+      userHasPassed: Boolean(passingAttempt),
+    })
   } catch (error) {
     console.error('Error fetching quiz:', error)
     return NextResponse.json(

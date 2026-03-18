@@ -119,6 +119,10 @@ pnpm test:e2e
   - Confirm `YOUTUBE_CHANNEL_ID`, `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN`
   - Verify the channel owner OAuth token can access the channel uploads playlist
   - Only `unlisted` and embeddable videos are imported in v1
+- AI quiz draft generation fails:
+  - Confirm `OPENAI_API_KEY` is set
+  - Optionally override `OPENAI_QUIZ_MODEL` if you want a different model than `gpt-5-mini`
+  - For best results on synced videos, make sure the YouTube upload has captions enabled
 
 ## Release
 
@@ -135,6 +139,8 @@ Owner responsibilities by phase are in [`docs/PHASE_TASKS.md`](docs/PHASE_TASKS.
   - `youtubeSyncEnabled`
   - `youtubeChannelId`
   - `youtubeOAuthConfigured`
+- Includes quiz generation readiness flag:
+  - `openaiQuizConfigured`
 
 ## Update Automation
 
@@ -181,6 +187,24 @@ For YouTube sync on Vercel Hobby:
 - or trigger `GET /api/cron/youtube-sync` from an external scheduler
 
 The built-in 15-minute YouTube cron is only suitable for Vercel Pro and above.
+
+## AI Quiz Drafts
+
+LearningHub can generate internal quiz drafts inside the module editor.
+
+### Required environment variables
+
+- `OPENAI_API_KEY=<your openai api key>`
+- `OPENAI_QUIZ_MODEL=gpt-5-mini`
+
+### Behavior
+
+- Quiz drafts are generated only when an admin clicks `Generate Quiz Draft`
+- For synced YouTube modules, LearningHub first tries to extract captions/transcript text
+- If no transcript is available, generation falls back to module metadata and admin notes
+- Cost is constrained by low-cost defaults: `gpt-5-mini`, a capped transcript window, capped admin-note input, and a 3-5 question draft size
+- Generated drafts are not auto-saved; admins review and save them in the existing quiz editor
+- Certificates are available only for modules with an internal quiz and a passed quiz attempt
 
 ## LH Compatibility Upstream
 

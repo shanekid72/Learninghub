@@ -1,5 +1,6 @@
 export type ModuleBadge = "MANDATORY" | "NEW" | "UPDATED"
 export type ModuleType = "VIDEO" | "DOC" | "SLIDES"
+export type ModuleQuizMode = "none" | "internal" | "external_embed" | "external_link"
 
 export interface Module {
   id: number | string
@@ -15,6 +16,7 @@ export interface Module {
   contentEmbedUrl: string
   openUrl?: string
   thumbnailUrl?: string
+  quizMode?: ModuleQuizMode
   quizEmbedUrl?: string
   quizUrl?: string
   lastUpdated: string

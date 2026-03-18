@@ -11,6 +11,7 @@ interface CertificateDownloadProps {
   moduleId: string
   moduleTitle: string
   isCompleted: boolean
+  requiresInternalQuiz: boolean
   quizPassed?: boolean
 }
 
@@ -18,6 +19,7 @@ export function CertificateDownload({
   moduleId, 
   moduleTitle, 
   isCompleted, 
+  requiresInternalQuiz,
   quizPassed = true 
 }: CertificateDownloadProps) {
   const [isGenerating, setIsGenerating] = useState(false)
@@ -25,7 +27,7 @@ export function CertificateDownload({
   const [showPreview, setShowPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const canGenerate = isCompleted && quizPassed
+  const canGenerate = isCompleted && requiresInternalQuiz && quizPassed
 
   const handleGenerate = async () => {
     if (!canGenerate) return
@@ -60,7 +62,8 @@ export function CertificateDownload({
     return (
       <div className="text-sm text-neutral-500">
         {!isCompleted && "Complete the module to earn a certificate"}
-        {isCompleted && !quizPassed && "Pass the quiz to earn a certificate"}
+        {isCompleted && !requiresInternalQuiz && "Certificates are available only for modules with an internal quiz"}
+        {isCompleted && requiresInternalQuiz && !quizPassed && "Pass the quiz to earn a certificate"}
       </div>
     )
   }

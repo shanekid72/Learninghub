@@ -15,6 +15,7 @@ export async function GET() {
     boolEnv("YOUTUBE_CLIENT_ID") &&
     boolEnv("YOUTUBE_CLIENT_SECRET") &&
     boolEnv("YOUTUBE_REFRESH_TOKEN")
+  const openaiQuizConfigured = boolEnv("OPENAI_API_KEY")
 
   const payload = {
     ok: true,
@@ -33,6 +34,7 @@ export async function GET() {
       youtubeSyncEnabled,
       youtubeChannelId: boolEnv("YOUTUBE_CHANNEL_ID"),
       youtubeOAuthConfigured,
+      openaiQuizConfigured,
     },
   }
 

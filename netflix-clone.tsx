@@ -58,6 +58,7 @@ function mapToModule(lh: LHModule): Module {
     contentEmbedUrl: lh.content_embed_url || "",
     openUrl: lh.open_url || undefined,
     thumbnailUrl: lh.thumbnail_url || undefined,
+    quizMode: lh.quiz_mode || "none",
     quizEmbedUrl: lh.quiz_embed_url || undefined,
     quizUrl: lh.quiz_url || undefined,
     dueDate: lh.due_date || undefined,

@@ -459,7 +459,7 @@ export function ModuleManager() {
           <CardHeader>
             <CardTitle className="text-white">YouTube Sync</CardTitle>
             <CardDescription className="text-neutral-400">
-              One-channel unlisted import with OAuth polling every 15 minutes.
+              One-channel unlisted import with OAuth-backed sync and admin review.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
