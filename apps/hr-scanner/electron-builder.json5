@@ -1,0 +1,15 @@
+{
+  appId: "com.learninghub.hrscanner",
+  productName: "LearningHub HR Scanner",
+  directories: {
+    output: "release"
+  },
+  files: [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "package.json"
+  ],
+  win: {
+    target: ["portable"]
+  }
+}

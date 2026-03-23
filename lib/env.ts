@@ -12,6 +12,11 @@ interface EnvConfig {
   RESEND_API_KEY?: string
   APP_BASE_URL?: string
   CRON_SECRET?: string
+  HR_INTEGRITY_ENABLED?: string
+  HR_SCANNER_PROTOCOL?: string
+  HR_INVITE_TTL_HOURS?: string
+  HR_UPLOAD_TOKEN_TTL_MINUTES?: string
+  HR_UPLOAD_TOKEN_SECRET?: string
   LH_BASE_URL?: string
   LH_API_KEY?: string
   AUTH_ALLOWED_EMAIL_DOMAINS?: string
@@ -45,6 +50,11 @@ export function validateEnv(): EnvConfig {
     RESEND_API_KEY: getEnvVar('RESEND_API_KEY'),
     APP_BASE_URL: getEnvVar('APP_BASE_URL'),
     CRON_SECRET: getEnvVar('CRON_SECRET'),
+    HR_INTEGRITY_ENABLED: getEnvVar('HR_INTEGRITY_ENABLED'),
+    HR_SCANNER_PROTOCOL: getEnvVar('HR_SCANNER_PROTOCOL'),
+    HR_INVITE_TTL_HOURS: getEnvVar('HR_INVITE_TTL_HOURS'),
+    HR_UPLOAD_TOKEN_TTL_MINUTES: getEnvVar('HR_UPLOAD_TOKEN_TTL_MINUTES'),
+    HR_UPLOAD_TOKEN_SECRET: getEnvVar('HR_UPLOAD_TOKEN_SECRET'),
     LH_BASE_URL: getEnvVar('LH_BASE_URL'),
     LH_API_KEY: getEnvVar('LH_API_KEY'),
     AUTH_ALLOWED_EMAIL_DOMAINS: getEnvVar('AUTH_ALLOWED_EMAIL_DOMAINS'),
@@ -75,6 +85,29 @@ export function isEmailConfigured(): boolean {
 
 export function isCronConfigured(): boolean {
   return !!process.env.CRON_SECRET
+}
+
+function isEnabled(value: string | undefined): boolean {
+  if (!value) return false
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
+}
+
+export function isHrIntegrityEnabled(): boolean {
+  return isEnabled(process.env.HR_INTEGRITY_ENABLED)
+}
+
+export function getHrScannerProtocol(): string {
+  return process.env.HR_SCANNER_PROTOCOL?.trim() || 'learninghub-hr'
+}
+
+export function getHrInviteTtlHours(): number {
+  const value = Number(process.env.HR_INVITE_TTL_HOURS || '72')
+  return Number.isFinite(value) && value > 0 ? value : 72
+}
+
+export function getHrUploadTokenTtlMinutes(): number {
+  const value = Number(process.env.HR_UPLOAD_TOKEN_TTL_MINUTES || '180')
+  return Number.isFinite(value) && value > 0 ? value : 180
 }
 
 export function isGoogleSheetsConfigured(): boolean {

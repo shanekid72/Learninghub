@@ -126,6 +126,174 @@ export type Database = {
           },
         ]
       }
+      hr_session_events: {
+        Row: {
+          actor_profile_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          session_id: string
+        }
+        Insert: {
+          actor_profile_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          session_id: string
+        }
+        Update: {
+          actor_profile_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_session_events_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_session_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "hr_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_session_invites: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          paired_at: string | null
+          revoked_at: string | null
+          session_id: string
+          token_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id: string
+          paired_at?: string | null
+          revoked_at?: string | null
+          session_id: string
+          token_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          paired_at?: string | null
+          revoked_at?: string | null
+          session_id?: string
+          token_hash?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_session_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_session_invites_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "hr_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_sessions: {
+        Row: {
+          candidate_email: string
+          candidate_name: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          id: string
+          job_title: string
+          latest_summary: Json | null
+          monitoring_started_at: string | null
+          paired_at: string | null
+          review_notes: string | null
+          review_outcome: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scheduled_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          candidate_email: string
+          candidate_name: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          job_title: string
+          latest_summary?: Json | null
+          monitoring_started_at?: string | null
+          paired_at?: string | null
+          review_notes?: string | null
+          review_outcome?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          candidate_email?: string
+          candidate_name?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          job_title?: string
+          latest_summary?: Json | null
+          monitoring_started_at?: string | null
+          paired_at?: string | null
+          review_notes?: string | null
+          review_outcome?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_sessions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_modules: {
         Row: {
           badges: string[]

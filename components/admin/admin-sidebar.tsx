@@ -9,6 +9,7 @@ import {
   BookOpen, 
   FileBarChart,
   Megaphone,
+  ShieldAlert,
   Target,
   ArrowLeft
 } from "lucide-react"
@@ -22,8 +23,11 @@ const navItems = [
   { href: "/admin/reports", label: "Reports", icon: FileBarChart },
 ]
 
-export function AdminSidebar() {
+export function AdminSidebar({ hrIntegrityEnabled = false }: { hrIntegrityEnabled?: boolean }) {
   const pathname = usePathname()
+  const items = hrIntegrityEnabled
+    ? [...navItems, { href: "/admin/hr", label: "HR Integrity", icon: ShieldAlert }]
+    : navItems
 
   return (
     <aside className="w-64 bg-neutral-900 border-r border-neutral-800 flex flex-col">
@@ -34,7 +38,7 @@ export function AdminSidebar() {
 
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const isActive = pathname === item.href || 
               (item.href !== "/admin" && pathname.startsWith(item.href))
             

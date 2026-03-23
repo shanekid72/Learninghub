@@ -20,6 +20,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -31,3 +32,9 @@ next-env.d.ts
 # test artifacts
 /test-results/
 /playwright-report/
+
+# electron scanner
+/apps/hr-scanner/dist/
+/apps/hr-scanner/dist-electron/
+/apps/hr-scanner/node_modules/
+/apps/hr-scanner/release/

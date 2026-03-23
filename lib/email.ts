@@ -4,6 +4,7 @@ import { buildWelcomeEmail } from './email-templates/welcome'
 import { buildCompletionEmail } from './email-templates/completion'
 import { buildReminderEmail } from './email-templates/reminder'
 import { buildUpdateEmail } from './email-templates/update'
+import { buildHrInviteEmail } from './email-templates/hr-invite'
 import {
   buildYoutubeSyncFailureEmail,
   buildYoutubeSyncSummaryEmail,
@@ -90,6 +91,7 @@ export type EmailType =
   | 'reminder'
   | 'certificate'
   | 'update'
+  | 'hr_invite'
   | 'youtube_sync_summary'
   | 'youtube_sync_failure'
 
@@ -153,6 +155,16 @@ export async function sendEmail({ to, type, data }: SendEmailParams) {
           dueDate: data.dueDate as string | undefined,
           note: data.note as string | undefined,
           hubUrl: data.hubUrl as string,
+        })
+        break
+
+      case 'hr_invite':
+        subject = `Interview integrity session for ${data.jobTitle || "your interview"}`
+        html = buildHrInviteEmail({
+          candidateName: data.candidateName as string,
+          jobTitle: data.jobTitle as string,
+          inviteUrl: data.inviteUrl as string,
+          expiresAt: data.expiresAt as string,
         })
         break
 
