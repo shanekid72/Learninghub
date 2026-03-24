@@ -38,6 +38,20 @@ type HrSessionSecurityFields = {
   scanner_public_key: string | null
 }
 type HrSessionSecurityRow = HrSessionRow & HrSessionSecurityFields
+type HrSessionIdResult = Promise<{
+  data: Pick<HrSessionRow, "id"> | null
+  error: unknown
+}>
+type HrSessionUpdateQuery = {
+  eq(column: string, value: string | number | null): HrSessionUpdateQuery
+  is(column: string, value: null): HrSessionUpdateQuery
+  select(columns: "id"): {
+    maybeSingle(): HrSessionIdResult
+  }
+}
+type HrSessionUpdateBuilder = {
+  update(values: Record<string, unknown>): HrSessionUpdateQuery
+}
 
 type HrPairSessionOptions = {
   platform?: string
@@ -110,6 +124,10 @@ function toSummaryJson(summary: HrRiskSummary): Json {
 
 function normalizePublicKey(publicKey: string): string {
   return publicKey.trim().replace(/\s+/g, "")
+}
+
+function hrSessionsUpdateBuilder(supabase: AdminSupabaseClient): HrSessionUpdateBuilder {
+  return supabase.from("hr_sessions") as unknown as HrSessionUpdateBuilder
 }
 
 function buildSessionListItem(
@@ -527,8 +545,7 @@ export async function pairHrSession(
     return { error: "not_allowed" }
   }
 
-  const { data: claimedSession, error: sessionError } = await (supabase
-    .from("hr_sessions") as any)
+  const { data: claimedSession, error: sessionError } = await hrSessionsUpdateBuilder(supabase)
     .update({
       status: "paired",
       paired_at: pairedAt,
@@ -684,8 +701,7 @@ export async function recordHrSummaryEvent(options: {
     updates.completed_at = now
   }
 
-  let updateQuery = (options.supabase
-    .from("hr_sessions") as any)
+  let updateQuery = hrSessionsUpdateBuilder(options.supabase)
     .update(updates)
     .eq("id", auth.session.id)
     .eq("scanner_last_sequence", currentSequence)
