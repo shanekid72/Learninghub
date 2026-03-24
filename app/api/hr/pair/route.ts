@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createAdminClient()
-    const result = await pairHrSession(supabase, parsed.data.token)
+    const result = await pairHrSession(supabase, parsed.data)
 
     if ("error" in result) {
       if (result.error === "invalid") {

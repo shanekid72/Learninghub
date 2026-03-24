@@ -2,6 +2,10 @@
 
 import type { ScannerSnapshot } from "./types"
 
+declare global {
+  const __HR_ALLOWED_ORIGINS__: string
+}
+
 type Cleanup = () => void
 
 interface ScannerApi {
@@ -19,3 +23,5 @@ declare global {
     scannerApi: ScannerApi
   }
 }
+
+export {}

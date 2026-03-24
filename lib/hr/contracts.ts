@@ -24,12 +24,14 @@ export const HR_EVENT_TYPES = [
   "completed",
   "reviewed",
 ] as const
+export const HR_UPLOAD_EVENT_TYPES = ["baseline", "heartbeat", "completed"] as const
 
 export type HrRiskFlag = (typeof HR_RISK_FLAGS)[number]
 export type HrRiskLevel = (typeof HR_RISK_LEVELS)[number]
 export type HrSessionStatus = (typeof HR_SESSION_STATUSES)[number]
 export type HrReviewOutcome = (typeof HR_REVIEW_OUTCOMES)[number]
 export type HrSessionEventType = (typeof HR_EVENT_TYPES)[number]
+export type HrUploadEventType = (typeof HR_UPLOAD_EVENT_TYPES)[number]
 
 export interface HrRiskSummary {
   flags: HrRiskFlag[]

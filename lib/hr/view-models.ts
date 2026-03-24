@@ -1,6 +1,15 @@
 import type { Json } from "@/lib/supabase/database.types"
 import type { HrReviewOutcome, HrRiskSummary, HrSessionEventType, HrSessionStatus } from "@/lib/hr/contracts"
 
+export type HrInviteValidationReason =
+  | "completed"
+  | "expired"
+  | "invalid"
+  | "paired"
+  | "revoked"
+  | "reviewed"
+  | "valid"
+
 export interface HrInviteSnapshot {
   expiresAt: string
   pairedAt: string | null
@@ -40,16 +49,33 @@ export interface HrSessionDetail extends HrSessionListItem {
   events: HrSessionEventItem[]
 }
 
+export interface HrPublicInviteSession {
+  candidateName: string
+  inviteExpiresAt: string | null
+  jobTitle: string
+  scheduledAt: string | null
+  status: HrSessionStatus
+}
+
 export interface HrInviteValidationResult {
   inviteId: string | null
-  reason:
-    | "completed"
-    | "expired"
-    | "invalid"
-    | "paired"
-    | "revoked"
-    | "reviewed"
-    | "valid"
-  session: HrSessionListItem | null
+  reason: HrInviteValidationReason
+  session: HrPublicInviteSession | null
   valid: boolean
+}
+
+export interface HrScannerSessionSnapshot {
+  candidateName: string
+  inviteExpiresAt: string | null
+  jobTitle: string
+  scheduledAt: string | null
+  sessionId: string
+}
+
+export interface HrPairSessionResult {
+  inviteId: string
+  scannerFingerprint: string
+  session: HrScannerSessionSnapshot
+  uploadToken: string
+  uploadTokenExpiresAt: string
 }

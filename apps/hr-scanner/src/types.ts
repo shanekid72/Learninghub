@@ -1,5 +1,6 @@
-import type { HrSessionDetail } from "../../../lib/hr/view-models"
+import type { HrScannerIdentity } from "../../../lib/hr/upload-signing"
 import type { HrRiskSummary } from "../../../lib/hr/contracts"
+import type { HrScannerSessionSnapshot } from "../../../lib/hr/view-models"
 
 export type ScannerSuspiciousProcess = {
   command?: string
@@ -21,8 +22,11 @@ export type ScannerSnapshot = {
 
 export type PairingState = {
   apiBaseUrl: string
-  session: HrSessionDetail
-  sessionLink: string
+  inviteId: string
+  lastUploadedSequence: number
+  scannerFingerprint: string
+  scannerIdentity: HrScannerIdentity
+  session: HrScannerSessionSnapshot
   uploadToken: string
   uploadTokenExpiresAt: string
 }

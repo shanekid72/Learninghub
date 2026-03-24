@@ -5,15 +5,23 @@ import {
   normalizeHrRiskSummary,
   type HrReviewOutcome,
   type HrRiskSummary,
-  type HrRiskSummaryInput,
   type HrSessionEventType,
   type HrSessionStatus,
+  type HrUploadEventType,
 } from "@/lib/hr/contracts"
 import { getHrBaseUrl, getHrInviteTtlHours } from "@/lib/hr/feature"
 import { createHrInviteToken, createHrUploadToken, verifyHrInviteToken, verifyHrUploadToken } from "@/lib/hr/tokens"
+import {
+  fingerprintHrScannerPublicKey,
+  verifyHrSummaryEnvelopeSignature,
+  type HrSignedSummaryEnvelope,
+} from "@/lib/hr/upload-signing"
 import type {
   HrInviteSnapshot,
   HrInviteValidationResult,
+  HrPairSessionResult,
+  HrPublicInviteSession,
+  HrScannerSessionSnapshot,
   HrSessionDetail,
   HrSessionListItem,
 } from "@/lib/hr/view-models"
@@ -24,6 +32,39 @@ type AdminSupabaseClient = Awaited<ReturnType<typeof createAdminClient>>
 type HrSessionRow = Tables<"hr_sessions">
 type HrSessionInviteRow = Tables<"hr_session_invites">
 type HrSessionEventRow = Tables<"hr_session_events">
+type HrSessionSecurityFields = {
+  scanner_key_fingerprint: string | null
+  scanner_last_sequence: number | null
+  scanner_public_key: string | null
+}
+type HrSessionSecurityRow = HrSessionRow & HrSessionSecurityFields
+
+type HrPairSessionOptions = {
+  platform?: string
+  scannerFingerprint?: string
+  scannerPublicKey: string
+  scannerVersion?: string
+  token: string
+}
+
+type HrSummaryEventFailure =
+  | "invalid_payload"
+  | "invalid_signature"
+  | "invalid_token"
+  | "not_allowed"
+  | "sequence_conflict"
+
+type HrSummaryEventSuccess = {
+  acceptedSequence: number
+  ok: true
+}
+
+type HrSummaryEventResult =
+  | HrSummaryEventSuccess
+  | {
+      error: HrSummaryEventFailure
+      ok: false
+    }
 
 function isObject(value: Json | null): value is Record<string, Json | undefined> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)
@@ -46,7 +87,9 @@ function parseHrSummary(value: Json | null): HrRiskSummary | null {
   }
 
   return normalizeHrRiskSummary({
-    flags: Array.isArray(value.flags) ? (value.flags.filter((flag): flag is HrRiskSummary["flags"][number] => typeof flag === "string")) : undefined,
+    flags: Array.isArray(value.flags)
+      ? value.flags.filter((flag): flag is HrRiskSummary["flags"][number] => typeof flag === "string")
+      : undefined,
     displayCount: typeof value.displayCount === "number" ? value.displayCount : undefined,
     highMemoryCount: typeof value.highMemoryCount === "number" ? value.highMemoryCount : undefined,
     networkProcessCount: typeof value.networkProcessCount === "number" ? value.networkProcessCount : undefined,
@@ -63,6 +106,10 @@ function parseHrSummary(value: Json | null): HrRiskSummary | null {
 
 function toSummaryJson(summary: HrRiskSummary): Json {
   return summary as unknown as Json
+}
+
+function normalizePublicKey(publicKey: string): string {
+  return publicKey.trim().replace(/\s+/g, "")
 }
 
 function buildSessionListItem(
@@ -104,6 +151,32 @@ function buildSessionDetail(
       payload: event.payload || {},
       summary: isObject(event.payload) && event.payload.summary ? parseHrSummary(event.payload.summary as Json) : null,
     })),
+  }
+}
+
+function buildPublicInviteSession(
+  session: HrSessionRow,
+  invite: HrSessionInviteRow | null | undefined,
+): HrPublicInviteSession {
+  return {
+    candidateName: session.candidate_name,
+    inviteExpiresAt: invite?.expires_at || null,
+    jobTitle: session.job_title,
+    scheduledAt: session.scheduled_at,
+    status: session.status as HrSessionStatus,
+  }
+}
+
+function buildScannerSessionSnapshot(
+  session: HrSessionRow,
+  invite: HrSessionInviteRow | null | undefined,
+): HrScannerSessionSnapshot {
+  return {
+    candidateName: session.candidate_name,
+    inviteExpiresAt: invite?.expires_at || null,
+    jobTitle: session.job_title,
+    scheduledAt: session.scheduled_at,
+    sessionId: session.id,
   }
 }
 
@@ -193,12 +266,12 @@ function isInviteExpired(invite: HrSessionInviteRow): boolean {
   return new Date(invite.expires_at).getTime() <= Date.now()
 }
 
-function canPairSession(session: HrSessionRow, invite: HrSessionInviteRow): boolean {
-  if (invite.revoked_at || isInviteExpired(invite)) {
+export function canPairSession(session: HrSessionRow, invite: HrSessionInviteRow): boolean {
+  if (invite.revoked_at || invite.used_at || isInviteExpired(invite)) {
     return false
   }
 
-  return !["completed", "reviewed", "cancelled", "expired"].includes(session.status)
+  return session.status === "invited"
 }
 
 function buildInviteEmailData(inviteUrl: string, expiresAt: string, jobTitle: string, candidateName: string) {
@@ -208,6 +281,10 @@ function buildInviteEmailData(inviteUrl: string, expiresAt: string, jobTitle: st
     inviteUrl,
     expiresAt,
   }
+}
+
+function isUploadBlocked(status: HrSessionStatus): boolean {
+  return ["completed", "reviewed", "cancelled", "expired"].includes(status)
 }
 
 export async function issueHrInvite(options: {
@@ -362,7 +439,7 @@ export async function getHrInviteValidation(
   }
 
   const latestInvite = await getLatestInviteBySessionId(supabase, session.id)
-  const sessionSnapshot = buildSessionListItem(session, latestInvite)
+  const sessionSnapshot = buildPublicInviteSession(session, latestInvite || invite)
 
   if (invite.revoked_at) {
     return { valid: false, reason: "revoked", session: sessionSnapshot, inviteId: invite.id }
@@ -397,16 +474,12 @@ export async function getHrInviteValidation(
 
 export async function pairHrSession(
   supabase: AdminSupabaseClient,
-  token: string,
+  options: HrPairSessionOptions,
 ): Promise<
   | { error: "invalid" | "not_allowed" | "not_found" }
-  | {
-      session: HrSessionListItem
-      uploadToken: string
-      uploadTokenExpiresAt: string
-    }
+  | HrPairSessionResult
 > {
-  const { invite, session } = await getInviteAndSessionByToken(supabase, token)
+  const { invite, session } = await getInviteAndSessionByToken(supabase, options.token)
   if (!invite) {
     return { error: "invalid" }
   }
@@ -419,56 +492,88 @@ export async function pairHrSession(
     return { error: "not_allowed" }
   }
 
-  const pairedAt = new Date().toISOString()
-  if (!invite.used_at) {
-    const { error: inviteError } = await supabase
-      .from("hr_session_invites")
-      .update({
-        paired_at: pairedAt,
-        used_at: pairedAt,
-      })
-      .eq("id", invite.id)
-      .is("used_at", null)
+  const scannerPublicKey = normalizePublicKey(options.scannerPublicKey)
+  let scannerFingerprint: string
 
-    if (inviteError) {
-      throw inviteError
-    }
-
-    const { error: sessionError } = await supabase
-      .from("hr_sessions")
-      .update({
-        status: "paired",
-        paired_at: pairedAt,
-      })
-      .eq("id", session.id)
-
-    if (sessionError) {
-      throw sessionError
-    }
-
-    await insertHrEvent(
-      supabase,
-      session.id,
-      "paired",
-      {
-        inviteId: invite.id,
-        pairedAt,
-      },
-      null,
-    )
+  try {
+    scannerFingerprint = await fingerprintHrScannerPublicKey(scannerPublicKey)
+  } catch {
+    return { error: "invalid" }
   }
 
+  if (options.scannerFingerprint && options.scannerFingerprint !== scannerFingerprint) {
+    return { error: "invalid" }
+  }
+
+  const pairedAt = new Date().toISOString()
+  const { data: claimedInvite, error: inviteError } = await supabase
+    .from("hr_session_invites")
+    .update({
+      paired_at: pairedAt,
+      used_at: pairedAt,
+    })
+    .eq("id", invite.id)
+    .is("used_at", null)
+    .is("revoked_at", null)
+    .gt("expires_at", pairedAt)
+    .select("id")
+    .maybeSingle()
+
+  if (inviteError) {
+    throw inviteError
+  }
+
+  if (!claimedInvite) {
+    return { error: "not_allowed" }
+  }
+
+  const { data: claimedSession, error: sessionError } = await (supabase
+    .from("hr_sessions") as any)
+    .update({
+      status: "paired",
+      paired_at: pairedAt,
+      scanner_public_key: scannerPublicKey,
+      scanner_key_fingerprint: scannerFingerprint,
+      scanner_last_sequence: 0,
+    })
+    .eq("id", session.id)
+    .eq("status", "invited")
+    .select("id")
+    .maybeSingle()
+
+  if (sessionError) {
+    throw sessionError
+  }
+
+  if (!claimedSession) {
+    return { error: "not_allowed" }
+  }
+
+  await insertHrEvent(
+    supabase,
+    session.id,
+    "paired",
+    {
+      inviteId: invite.id,
+      pairedAt,
+      platform: options.platform || null,
+      scannerFingerprint,
+      scannerVersion: options.scannerVersion || null,
+    },
+    null,
+  )
+
+  const latestInvite = await getLatestInviteBySessionId(supabase, session.id)
   const { token: uploadToken, expiresAt: uploadTokenExpiresAt } = await createHrUploadToken(
     session.id,
     invite.id,
+    scannerFingerprint,
   )
-  const detail = await getHrSessionDetail(supabase, session.id)
-  if (!detail) {
-    return { error: "not_found" }
-  }
 
   return {
-    session: detail,
+    inviteId: invite.id,
+    scannerFingerprint,
+    session: buildScannerSessionSnapshot(session, latestInvite || invite),
     uploadToken,
     uploadTokenExpiresAt,
   }
@@ -480,7 +585,7 @@ async function getSessionFromUploadToken(supabase: AdminSupabaseClient, token: s
     return null
   }
 
-  const [{ data: session, error: sessionError }, { data: invite, error: inviteError }] =
+  const [{ data: rawSession, error: sessionError }, { data: invite, error: inviteError }] =
     await Promise.all([
       supabase.from("hr_sessions").select("*").eq("id", payload.sessionId).maybeSingle(),
       supabase.from("hr_session_invites").select("*").eq("id", payload.inviteId).maybeSingle(),
@@ -493,7 +598,17 @@ async function getSessionFromUploadToken(supabase: AdminSupabaseClient, token: s
     throw inviteError
   }
 
+  const session = rawSession as HrSessionSecurityRow | null
+
   if (!session || !invite || invite.session_id !== session.id) {
+    return null
+  }
+
+  if (
+    !session.scanner_public_key ||
+    !session.scanner_key_fingerprint ||
+    session.scanner_key_fingerprint !== payload.scannerFingerprint
+  ) {
     return null
   }
 
@@ -503,29 +618,51 @@ async function getSessionFromUploadToken(supabase: AdminSupabaseClient, token: s
 export async function recordHrSummaryEvent(options: {
   actorProfileId?: string | null
   authToken: string
-  eventType: "baseline" | "heartbeat" | "completed"
-  summary: HrRiskSummaryInput
+  envelope: HrSignedSummaryEnvelope
+  eventType: HrUploadEventType
+  signature: string
   supabase: AdminSupabaseClient
-}): Promise<HrSessionDetail | null> {
+}): Promise<HrSummaryEventResult> {
   const auth = await getSessionFromUploadToken(options.supabase, options.authToken)
   if (!auth) {
-    return null
+    return { ok: false, error: "invalid_token" }
   }
 
-  if (["reviewed", "cancelled", "expired"].includes(auth.session.status)) {
-    return null
+  const sessionStatus = auth.session.status as HrSessionStatus
+  if (isUploadBlocked(sessionStatus)) {
+    return { ok: false, error: "not_allowed" }
   }
 
-  if (auth.session.status === "completed" && options.eventType !== "completed") {
-    return null
+  if (
+    options.envelope.eventType !== options.eventType ||
+    options.envelope.inviteId !== auth.invite.id ||
+    options.envelope.sessionId !== auth.session.id
+  ) {
+    return { ok: false, error: "invalid_payload" }
+  }
+
+  const scannerPublicKey = auth.session.scanner_public_key!
+  const signatureValid = await verifyHrSummaryEnvelopeSignature(
+    scannerPublicKey,
+    options.envelope,
+    options.signature,
+  )
+
+  if (!signatureValid) {
+    return { ok: false, error: "invalid_signature" }
+  }
+
+  const currentSequence = auth.session.scanner_last_sequence || 0
+  if (options.envelope.sequence <= currentSequence) {
+    return { ok: false, error: "sequence_conflict" }
   }
 
   const now = new Date().toISOString()
   const summary = normalizeHrRiskSummary(
     {
-      ...options.summary,
+      ...options.envelope.summary,
       monitoringStartedAt:
-        options.summary.monitoringStartedAt ||
+        options.envelope.summary.monitoringStartedAt ||
         auth.session.monitoring_started_at ||
         now,
       lastUpdatedAt: now,
@@ -533,14 +670,10 @@ export async function recordHrSummaryEvent(options: {
     now,
   )
 
-  const status =
-    options.eventType === "completed"
-      ? "completed"
-      : "monitoring"
-
-  const updates: Partial<HrSessionRow> = {
+  const updates: Record<string, unknown> = {
     latest_summary: toSummaryJson(summary),
-    status,
+    scanner_last_sequence: options.envelope.sequence,
+    status: options.eventType === "completed" ? "completed" : "monitoring",
   }
 
   if (!auth.session.monitoring_started_at) {
@@ -551,13 +684,26 @@ export async function recordHrSummaryEvent(options: {
     updates.completed_at = now
   }
 
-  const { error: updateError } = await options.supabase
-    .from("hr_sessions")
+  let updateQuery = (options.supabase
+    .from("hr_sessions") as any)
     .update(updates)
     .eq("id", auth.session.id)
+    .eq("scanner_last_sequence", currentSequence)
+
+  if (options.eventType === "completed") {
+    updateQuery = updateQuery.is("completed_at", null)
+  }
+
+  const { data: updatedSession, error: updateError } = await updateQuery
+    .select("id")
+    .maybeSingle()
 
   if (updateError) {
     throw updateError
+  }
+
+  if (!updatedSession) {
+    return { ok: false, error: "sequence_conflict" }
   }
 
   await insertHrEvent(
@@ -565,12 +711,18 @@ export async function recordHrSummaryEvent(options: {
     auth.session.id,
     options.eventType === "completed" ? "completed" : options.eventType,
     {
+      scannerFingerprint: auth.session.scanner_key_fingerprint,
+      sequence: options.envelope.sequence,
+      signedAt: options.envelope.signedAt,
       summary: toSummaryJson(summary),
     },
     options.actorProfileId || null,
   )
 
-  return getHrSessionDetail(options.supabase, auth.session.id)
+  return {
+    ok: true,
+    acceptedSequence: options.envelope.sequence,
+  }
 }
 
 export async function reviewHrSession(options: {

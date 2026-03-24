@@ -3,8 +3,14 @@ import {
   HR_REVIEW_OUTCOMES,
   HR_RISK_FLAGS,
   HR_RISK_LEVELS,
+  HR_UPLOAD_EVENT_TYPES,
   type HrRiskSummaryInput,
 } from "@/lib/hr/contracts"
+
+const base64UrlSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9\-_]+$/, "Expected base64url-encoded content")
 
 export const hrRiskSummarySchema = z.object({
   flags: z.array(z.enum(HR_RISK_FLAGS)).optional(),
@@ -32,18 +38,47 @@ export const issueHrInviteSchema = z.object({
   sendEmail: z.boolean().optional(),
 })
 
-export const pairHrSessionSchema = z.object({
+export const validateHrInviteSchema = z.object({
   token: z.string().trim().min(10).max(1024),
 })
 
-export const hrHeartbeatSchema = z.object({
-  eventType: z.enum(["baseline", "heartbeat"]).optional(),
+export const pairHrSessionSchema = z.object({
+  platform: z.string().trim().max(80).optional(),
+  scannerFingerprint: base64UrlSchema.min(20).max(120).optional(),
+  scannerPublicKey: base64UrlSchema.min(80).max(4096),
+  scannerVersion: z.string().trim().max(80).optional(),
+  token: z.string().trim().min(10).max(1024),
+})
+
+const hrSignedSummaryEnvelopeSchema = z.object({
+  eventType: z.enum(HR_UPLOAD_EVENT_TYPES),
+  inviteId: z.string().uuid(),
+  sequence: z.number().int().min(1).max(1_000_000),
+  sessionId: z.string().uuid(),
+  signedAt: z.string().datetime({ offset: true }),
   summary: hrRiskSummarySchema,
 })
 
-export const hrCompleteSchema = z.object({
-  summary: hrRiskSummarySchema,
+const hrSignedSummaryUploadSchema = z.object({
+  envelope: hrSignedSummaryEnvelopeSchema,
+  signature: base64UrlSchema.min(40).max(1024),
 })
+
+export const hrHeartbeatSchema = hrSignedSummaryUploadSchema.refine(
+  (payload) => payload.envelope.eventType !== "completed",
+  {
+    message: "Heartbeat uploads cannot mark a session complete",
+    path: ["envelope", "eventType"],
+  },
+)
+
+export const hrCompleteSchema = hrSignedSummaryUploadSchema.refine(
+  (payload) => payload.envelope.eventType === "completed",
+  {
+    message: "Completion uploads must use the completed event type",
+    path: ["envelope", "eventType"],
+  },
+)
 
 export const reviewHrSessionSchema = z
   .object({

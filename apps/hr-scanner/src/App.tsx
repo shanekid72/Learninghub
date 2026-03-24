@@ -1,7 +1,58 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  createHrSignedSummaryEnvelope,
+  generateHrScannerIdentity,
+  signHrSummaryEnvelope,
+} from "../../../lib/hr/upload-signing"
+import type { HrPairSessionResult } from "../../../lib/hr/view-models"
 import type { PairingState, ScannerSnapshot } from "./types"
 
-function extractSessionConfig(input: string, fallbackBaseUrl: string) {
+const PAIRING_STORAGE_KEY = "learninghub.hr-scanner.pairing"
+const LOCALHOST_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"])
+
+type SessionConfig = {
+  apiBaseUrl: string
+  token: string
+}
+
+function parseAllowedOrigins(rawValue: string): string[] {
+  return rawValue
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+}
+
+function isLocalhost(hostname: string): boolean {
+  return LOCALHOST_HOSTNAMES.has(hostname.toLowerCase())
+}
+
+function normalizeTrustedApiBaseUrl(input: string, allowedOrigins: string[]): string {
+  const url = new URL(input.trim())
+
+  if (isLocalhost(url.hostname)) {
+    if (!["http:", "https:"].includes(url.protocol)) {
+      throw new Error("Local development scanners only support http:// or https:// origins.")
+    }
+
+    return url.origin
+  }
+
+  if (url.protocol !== "https:") {
+    throw new Error("LearningHub interview scanners only pair over HTTPS.")
+  }
+
+  if (allowedOrigins.length === 0) {
+    throw new Error("This scanner build is missing a trusted LearningHub origin allowlist.")
+  }
+
+  if (!allowedOrigins.includes(url.origin)) {
+    throw new Error("This session link does not match a trusted LearningHub origin.")
+  }
+
+  return url.origin
+}
+
+function extractSessionConfig(input: string, fallbackBaseUrl: string, allowedOrigins: string[]): SessionConfig {
   const trimmed = input.trim()
   if (!trimmed) {
     throw new Error("Paste the interview session link from LearningHub.")
@@ -9,24 +60,32 @@ function extractSessionConfig(input: string, fallbackBaseUrl: string) {
 
   try {
     const url = new URL(trimmed)
-    const token = decodeURIComponent(url.pathname.split("/").filter(Boolean).at(-1) || "")
+    const pathSegments = url.pathname.split("/").filter(Boolean)
+
+    if (pathSegments.length < 3 || pathSegments[0] !== "hr" || pathSegments[1] !== "interview") {
+      throw new Error("Expected a LearningHub HR interview link.")
+    }
+
+    const token = decodeURIComponent(pathSegments[2] || "")
     if (!token) {
       throw new Error("Session link is missing a token.")
     }
 
     return {
-      apiBaseUrl: url.origin.replace(/\/+$/, ""),
-      sessionLink: url.toString(),
+      apiBaseUrl: normalizeTrustedApiBaseUrl(url.origin, allowedOrigins),
       token,
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message !== "Invalid URL") {
+      throw error
+    }
+
     if (!fallbackBaseUrl.trim()) {
-      throw new Error("Paste the full session link, or provide an API base URL for manual pairing.")
+      throw new Error("Paste the full session link, or provide a trusted LearningHub base URL for manual pairing.")
     }
 
     return {
-      apiBaseUrl: fallbackBaseUrl.trim().replace(/\/+$/, ""),
-      sessionLink: "",
+      apiBaseUrl: normalizeTrustedApiBaseUrl(fallbackBaseUrl, allowedOrigins),
       token: trimmed,
     }
   }
@@ -37,11 +96,61 @@ function formatDate(value: string | null | undefined) {
   return new Date(value).toLocaleString()
 }
 
+function isUploadTokenExpired(value: string): boolean {
+  return new Date(value).getTime() <= Date.now()
+}
+
+function restorePairingState(): PairingState | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  try {
+    const rawState = window.localStorage.getItem(PAIRING_STORAGE_KEY)
+    if (!rawState) {
+      return null
+    }
+
+    const parsed = JSON.parse(rawState) as PairingState
+    if (!parsed.uploadToken || !parsed.uploadTokenExpiresAt || isUploadTokenExpired(parsed.uploadTokenExpiresAt)) {
+      window.localStorage.removeItem(PAIRING_STORAGE_KEY)
+      return null
+    }
+
+    return parsed
+  } catch {
+    window.localStorage.removeItem(PAIRING_STORAGE_KEY)
+    return null
+  }
+}
+
+function persistPairingState(value: PairingState | null) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  if (!value) {
+    window.localStorage.removeItem(PAIRING_STORAGE_KEY)
+    return
+  }
+
+  window.localStorage.setItem(PAIRING_STORAGE_KEY, JSON.stringify(value))
+}
+
 async function postSummary(
   pairing: PairingState,
   snapshot: ScannerSnapshot,
   eventType: "baseline" | "heartbeat" | "completed",
 ) {
+  const envelope = createHrSignedSummaryEnvelope({
+    eventType,
+    inviteId: pairing.inviteId,
+    sequence: pairing.lastUploadedSequence + 1,
+    sessionId: pairing.session.sessionId,
+    signedAt: new Date().toISOString(),
+    summary: snapshot.summary,
+  })
+  const signature = await signHrSummaryEnvelope(pairing.scannerIdentity.privateKey, envelope)
   const path = eventType === "completed" ? "/api/hr/complete" : "/api/hr/heartbeat"
   const response = await fetch(`${pairing.apiBaseUrl}${path}`, {
     method: "POST",
@@ -49,31 +158,52 @@ async function postSummary(
       "Content-Type": "application/json",
       Authorization: `Bearer ${pairing.uploadToken}`,
     },
-    body: JSON.stringify(
-      eventType === "completed"
-        ? { summary: snapshot.summary }
-        : { eventType, summary: snapshot.summary },
-    ),
+    body: JSON.stringify({ envelope, signature }),
   })
 
-  const payload = (await response.json()) as { error?: string }
+  const payload = (await response.json()) as { acceptedSequence?: number; error?: string }
   if (!response.ok) {
     throw new Error(payload.error || `Failed to upload ${eventType} summary`)
   }
+
+  if (typeof payload.acceptedSequence !== "number") {
+    throw new Error(`LearningHub did not acknowledge the ${eventType} upload.`)
+  }
+
+  return payload.acceptedSequence
 }
 
 export default function App() {
+  const allowedOrigins = parseAllowedOrigins(__HR_ALLOWED_ORIGINS__)
+  const initialPairingRef = useRef<PairingState | null | undefined>(undefined)
+  if (initialPairingRef.current === undefined) {
+    initialPairingRef.current = restorePairingState()
+  }
+
+  const initialPairing = initialPairingRef.current || null
   const [appVersion, setAppVersion] = useState("0.1.0")
   const [sessionInput, setSessionInput] = useState("")
   const [fallbackApiBaseUrl, setFallbackApiBaseUrl] = useState("")
-  const [pairing, setPairing] = useState<PairingState | null>(null)
+  const [pairing, setPairing] = useState<PairingState | null>(initialPairing)
   const [snapshot, setSnapshot] = useState<ScannerSnapshot | null>(null)
-  const [statusMessage, setStatusMessage] = useState("Paste a LearningHub interview link to begin.")
+  const [statusMessage, setStatusMessage] = useState(
+    initialPairing
+      ? "Existing scanner pairing restored locally."
+      : "Paste a LearningHub interview link to begin.",
+  )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<"baseline" | "complete" | "monitoring" | "pair" | null>(null)
   const [monitoringActive, setMonitoringActive] = useState(false)
-  const pairingRef = useRef<PairingState | null>(null)
+  const pairingRef = useRef<PairingState | null>(initialPairing)
   const uploadInFlightRef = useRef(false)
+
+  const updatePairingState = useCallback((nextPairing: PairingState | null | ((current: PairingState | null) => PairingState | null)) => {
+    setPairing((current) => {
+      const resolvedPairing = typeof nextPairing === "function" ? nextPairing(current) : nextPairing
+      persistPairingState(resolvedPairing)
+      return resolvedPairing
+    })
+  }, [])
 
   useEffect(() => {
     pairingRef.current = pairing
@@ -100,7 +230,15 @@ export default function App() {
 
       uploadInFlightRef.current = true
       void postSummary(pairingRef.current, nextSnapshot, "heartbeat")
-        .then(() => {
+        .then((acceptedSequence) => {
+          updatePairingState((current) =>
+            current
+              ? {
+                  ...current,
+                  lastUploadedSequence: acceptedSequence,
+                }
+              : current,
+          )
           setStatusMessage("Monitoring update uploaded.")
         })
         .catch((uploadError) => {
@@ -123,37 +261,73 @@ export default function App() {
       stopSessionLink()
       stopMonitoring()
     }
-  }, [])
+  }, [updatePairingState])
+
+  async function uploadSnapshot(
+    currentPairing: PairingState,
+    nextSnapshot: ScannerSnapshot,
+    eventType: "baseline" | "heartbeat" | "completed",
+  ) {
+    const acceptedSequence = await postSummary(currentPairing, nextSnapshot, eventType)
+    updatePairingState((existingPairing) =>
+      existingPairing
+        ? {
+            ...existingPairing,
+            lastUploadedSequence: acceptedSequence,
+          }
+        : existingPairing,
+    )
+
+    return acceptedSequence
+  }
 
   async function handlePair() {
     setBusy("pair")
     setError(null)
 
     try {
-      const config = extractSessionConfig(sessionInput, fallbackApiBaseUrl)
+      const config = extractSessionConfig(sessionInput, fallbackApiBaseUrl, allowedOrigins)
+      const scannerIdentity = await generateHrScannerIdentity()
       const response = await fetch(`${config.apiBaseUrl}/api/hr/pair`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: config.token }),
+        body: JSON.stringify({
+          token: config.token,
+          scannerFingerprint: scannerIdentity.fingerprint,
+          scannerPublicKey: scannerIdentity.publicKey,
+          scannerVersion: appVersion,
+          platform: window.navigator.platform || "win32",
+        }),
       })
 
-      const payload = (await response.json()) as {
+      const payload = (await response.json()) as Partial<HrPairSessionResult> & {
         error?: string
-        session?: PairingState["session"]
-        uploadToken?: string
-        uploadTokenExpiresAt?: string
       }
 
-      if (!response.ok || !payload.session || !payload.uploadToken || !payload.uploadTokenExpiresAt) {
+      if (
+        !response.ok ||
+        !payload.inviteId ||
+        !payload.session ||
+        !payload.uploadToken ||
+        !payload.uploadTokenExpiresAt ||
+        !payload.scannerFingerprint
+      ) {
         throw new Error(payload.error || "Failed to pair session")
+      }
+
+      if (payload.scannerFingerprint !== scannerIdentity.fingerprint) {
+        throw new Error("LearningHub rejected the scanner identity fingerprint.")
       }
 
       await window.scannerApi.stopMonitoring()
       setMonitoringActive(false)
-      setPairing({
+      updatePairingState({
         apiBaseUrl: config.apiBaseUrl,
+        inviteId: payload.inviteId,
+        lastUploadedSequence: 0,
+        scannerFingerprint: payload.scannerFingerprint,
+        scannerIdentity,
         session: payload.session,
-        sessionLink: config.sessionLink || sessionInput.trim(),
         uploadToken: payload.uploadToken,
         uploadTokenExpiresAt: payload.uploadTokenExpiresAt,
       })
@@ -175,7 +349,7 @@ export default function App() {
     try {
       const nextSnapshot = await window.scannerApi.runBaselineCheck()
       setSnapshot(nextSnapshot)
-      await postSummary(pairing, nextSnapshot, "baseline")
+      await uploadSnapshot(pairing, nextSnapshot, "baseline")
       setStatusMessage("Baseline uploaded. Start monitoring when the interview begins.")
     } catch (baselineError) {
       setError(baselineError instanceof Error ? baselineError.message : "Failed to run baseline check")
@@ -194,7 +368,7 @@ export default function App() {
       if (!snapshot) {
         const baselineSnapshot = await window.scannerApi.runBaselineCheck()
         setSnapshot(baselineSnapshot)
-        await postSummary(pairing, baselineSnapshot, "baseline")
+        await uploadSnapshot(pairing, baselineSnapshot, "baseline")
       }
       await window.scannerApi.startMonitoring()
       setMonitoringActive(true)
@@ -221,9 +395,10 @@ export default function App() {
     try {
       const nextSnapshot = snapshot || (await window.scannerApi.runBaselineCheck())
       setSnapshot(nextSnapshot)
-      await postSummary(pairing, nextSnapshot, "completed")
+      await uploadSnapshot(pairing, nextSnapshot, "completed")
       await window.scannerApi.stopMonitoring()
       setMonitoringActive(false)
+      updatePairingState(null)
       setStatusMessage("Session marked complete. HR can review the uploaded timeline now.")
     } catch (completeError) {
       setError(completeError instanceof Error ? completeError.message : "Failed to complete session")
@@ -249,7 +424,7 @@ export default function App() {
         <section className="panel">
           <h2>1. Pair Scanner</h2>
           <p className="panel-copy">
-            Paste the full session link from LearningHub. If you only have a raw token, provide the web app base URL as well.
+            Paste the full session link from LearningHub. Manual pairing is only allowed against a trusted LearningHub base URL.
           </p>
           <textarea
             className="input input-large"
@@ -261,7 +436,7 @@ export default function App() {
             className="input"
             value={fallbackApiBaseUrl}
             onChange={(event) => setFallbackApiBaseUrl(event.target.value)}
-            placeholder="Optional API base URL for manual token pairing"
+            placeholder="Optional trusted LearningHub base URL for manual token pairing"
           />
           <div className="actions">
             <button className="primary-button" onClick={() => void handlePair()} disabled={busy === "pair"}>

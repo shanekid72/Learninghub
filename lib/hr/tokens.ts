@@ -5,6 +5,7 @@ type HrUploadTokenPayload = {
   iat: number
   inviteId: string
   kind: "hr_upload"
+  scannerFingerprint: string
   sessionId: string
 }
 
@@ -106,12 +107,14 @@ export async function verifyHrInviteToken(
 export async function createHrUploadToken(
   sessionId: string,
   inviteId: string,
+  scannerFingerprint: string,
 ): Promise<{ expiresAt: string; token: string }> {
   const now = Math.floor(Date.now() / 1000)
   const payload: HrUploadTokenPayload = {
     kind: "hr_upload",
     sessionId,
     inviteId,
+    scannerFingerprint,
     iat: now,
     exp: now + Math.floor(getHrUploadTokenTtlMinutes() * 60),
   }
@@ -146,6 +149,8 @@ export async function verifyHrUploadToken(token: string): Promise<HrUploadTokenP
       payload.kind !== "hr_upload" ||
       !parseUuidLike(payload.sessionId) ||
       !parseUuidLike(payload.inviteId) ||
+      typeof payload.scannerFingerprint !== "string" ||
+      payload.scannerFingerprint.length < 20 ||
       payload.exp <= now
     ) {
       return null

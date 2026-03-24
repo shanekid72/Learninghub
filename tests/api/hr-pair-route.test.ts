@@ -21,6 +21,8 @@ vi.mock("@/lib/supabase/server", () => ({
 import { POST } from "@/app/api/hr/pair/route"
 
 describe("POST /api/hr/pair", () => {
+  const scannerPublicKey = "A".repeat(120)
+
   beforeEach(() => {
     mocks.isHrIntegrityEnabled.mockReturnValue(true)
     mocks.createAdminClient.mockResolvedValue({})
@@ -32,7 +34,10 @@ describe("POST /api/hr/pair", () => {
     const response = await POST(
       new Request("http://localhost/api/hr/pair", {
         method: "POST",
-        body: JSON.stringify({ token: "x".repeat(20) }),
+        body: JSON.stringify({
+          token: "x".repeat(20),
+          scannerPublicKey,
+        }),
       }),
     )
 
@@ -60,7 +65,11 @@ describe("POST /api/hr/pair", () => {
     const response = await POST(
       new Request("http://localhost/api/hr/pair", {
         method: "POST",
-        body: JSON.stringify({ token: "x".repeat(20) }),
+        body: JSON.stringify({
+          token: "x".repeat(20),
+          scannerFingerprint: "fingerprint-1234567890",
+          scannerPublicKey,
+        }),
       }),
     )
 

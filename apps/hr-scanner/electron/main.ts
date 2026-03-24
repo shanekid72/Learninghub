@@ -54,9 +54,22 @@ function createWindow() {
     backgroundColor: "#0a0a0a",
     webPreferences: {
       preload: path.join(MAIN_DIST, "preload.mjs"),
-      nodeIntegration: false,
       contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
+  })
+
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }))
+  mainWindow.webContents.on("will-navigate", (event, nextUrl) => {
+    const allowNavigation =
+      (VITE_DEV_SERVER_URL && nextUrl.startsWith(VITE_DEV_SERVER_URL)) ||
+      nextUrl.startsWith("file://")
+
+    if (!allowNavigation) {
+      event.preventDefault()
+    }
   })
 
   if (VITE_DEV_SERVER_URL) {

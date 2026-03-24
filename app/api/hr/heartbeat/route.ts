@@ -25,18 +25,31 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createAdminClient()
-    const session = await recordHrSummaryEvent({
+    const result = await recordHrSummaryEvent({
       authToken,
-      eventType: parsed.data.eventType || "heartbeat",
-      summary: parsed.data.summary,
+      envelope: parsed.data.envelope,
+      eventType: parsed.data.envelope.eventType,
+      signature: parsed.data.signature,
       supabase,
     })
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized or expired HR upload token" }, { status: 401 })
+    if (!result.ok) {
+      if (result.error === "invalid_token") {
+        return NextResponse.json({ error: "Unauthorized or expired HR upload token" }, { status: 401 })
+      }
+
+      if (result.error === "invalid_payload") {
+        return NextResponse.json({ error: "Invalid signed HR payload" }, { status: 400 })
+      }
+
+      if (result.error === "invalid_signature") {
+        return NextResponse.json({ error: "HR upload signature verification failed" }, { status: 403 })
+      }
+
+      return NextResponse.json({ error: "This HR session no longer accepts uploads" }, { status: 409 })
     }
 
-    return NextResponse.json({ session })
+    return NextResponse.json({ acceptedSequence: result.acceptedSequence })
   } catch (error) {
     console.error("Error recording HR heartbeat:", error)
     return NextResponse.json({ error: "Failed to record HR heartbeat" }, { status: 500 })

@@ -39,8 +39,11 @@ export function HrInterviewAccess({
       setLoading(true)
 
       try {
-        const response = await fetch(`/api/hr/invite/validate?token=${encodeURIComponent(token)}`, {
+        const response = await fetch("/api/hr/invite/validate", {
+          method: "POST",
           cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
         })
         const payload = (await response.json()) as HrInviteValidationResult
         if (mounted) {
@@ -98,9 +101,9 @@ export function HrInterviewAccess({
                   <Badge variant="secondary" className="bg-neutral-800 text-neutral-200">
                     {result.reason}
                   </Badge>
-                  {result.session.activeInvite ? (
+                  {result.session.inviteExpiresAt ? (
                     <Badge variant="secondary" className="bg-neutral-800 text-neutral-200">
-                      invite expires {formatDate(result.session.activeInvite.expiresAt)}
+                      invite expires {formatDate(result.session.inviteExpiresAt)}
                     </Badge>
                   ) : null}
                 </div>
