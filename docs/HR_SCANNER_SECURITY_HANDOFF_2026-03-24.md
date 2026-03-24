@@ -1,228 +1,109 @@
-# HR Scanner Security Handoff Report
+# HR Scanner Security Current Status Report
 
 Date: 2026-03-24
 Repository: `D:\Projects\Learninghub\Learninghub`
-Production hardening commit: `557effd56d8b7fb90d21bebcedcdf55a370679ec`
-Supabase migration applied: `supabase/migrations/20260324_hr_interview_integrity_hardening.sql`
-
-## Scope
-
-Reviewed components:
-- `apps/hr-scanner`
-- public HR candidate routes
-- HR upload and pairing APIs
-- token generation and validation helpers
-- Supabase HR persistence model
-- Windows scanner packaging path
-
-Reviewed artifact:
-- `apps/hr-scanner/release/LearningHub HR Scanner 0.1.0.exe`
-- SHA-256: `DCCE1652FA9575C8E20554BFB1AA17C0357EFFFABBEA58B3ED042E78BED3F992`
+Assessment scope: LearningHub HR interview integrity flow, `apps/hr-scanner`, public HR candidate routes, HR API routes, token handling, Supabase persistence, and Windows scanner packaging
+Application security baseline: `557effd56d8b7fb90d21bebcedcdf55a370679ec`
+Database hardening migration: `supabase/migrations/20260324_hr_interview_integrity_hardening.sql`
+Reviewed artifact: `apps/hr-scanner/release/LearningHub HR Scanner 0.1.0.exe`
+Artifact SHA-256: `DCCE1652FA9575C8E20554BFB1AA17C0357EFFFABBEA58B3ED042E78BED3F992`
 
 ## Executive Summary
 
-The original HR scanner implementation was not suitable for security signoff because the telemetry path was bearer-token based, public invite validation returned excess internal data, pairing was not truly one-time, and completed sessions were still mutable.
+The current HR scanner implementation uses one-time pairing, signed scanner uploads, replay resistance, immutable completion handling, minimized public candidate data exposure, trusted-origin enforcement, and hardened Electron runtime settings.
 
-Those issues have now been remediated in the deployed code path. The scanner and backend now enforce one-time pairing, signed uploads, replay resistance, immutable completion, public-response minimization, trusted-origin restrictions, and stronger Electron renderer hardening.
+The platform stores bounded interview-integrity summaries for HR review and does not persist raw process lists, full command lines, or raw network connection dumps in Supabase.
 
-The remaining material limitation is architectural: this scanner still runs on a candidate-managed Windows device. It is therefore a hardened, low-assurance endpoint control rather than a hardware-attested forensic control. A sufficiently capable local user can still tamper with their own environment.
+In its current state, this implementation is suitable to operate as a hardened HR risk-signal control with human review. It should not be described as a hardware-attested, forensic-grade, or tamper-proof anti-cheat system because the candidate endpoint remains an untrusted Windows host.
 
-## Review Method
+## Current Security Controls
 
-- Static review of the scanner, HR APIs, public candidate flow, shared token/signing code, and persistence model
-- Validation of the hardened scanner packaging path
-- Regression testing of the new security invariants
-- Supabase migration application and schema verification
+### Pairing and session integrity
 
-Not performed in this pass:
-- binary reverse engineering
-- EDR bypass testing
-- TLS interception testing
-- live packet capture
-- red-team style local tampering exercise
+- HR interview invites are single-use for scanner pairing.
+- Pairing is bound to a single scanner identity for the session.
+- Pairing rejects expired, revoked, or previously used invites.
 
-## Original Findings And Status
+### Scanner identity and upload validation
 
-### 1. Forgeable scanner telemetry
-Original severity: `P1`
+- The scanner generates an ECDSA P-256 keypair during pairing.
+- The server stores the scanner public key and fingerprint on the HR session.
+- Baseline, heartbeat, and completion events are signed by the paired scanner identity.
+- Upload tokens are bound to the paired scanner fingerprint.
 
-Original issue:
-- Any holder of a valid invite/upload token could post plain JSON summaries.
-- The server had no scanner-bound signature or replay protection.
+### Replay resistance and state protection
 
-Remediation:
-- Scanner now generates an ECDSA P-256 keypair at pair time.
-- Server stores `scanner_public_key` and `scanner_key_fingerprint` on the HR session.
-- Upload token is bound to the scanner fingerprint.
-- Baseline, heartbeat, and completion uploads are signed.
-- Server verifies the signature before accepting the event.
-- Server persists and enforces monotonic `scanner_last_sequence`.
+- Each scanner upload carries a monotonic sequence number.
+- The server stores the latest accepted sequence and rejects duplicate or older submissions.
+- Completed sessions are immutable from the scanner upload path.
 
-Current status:
-- materially improved
-- replay and blind token-only submission are mitigated
-- residual limitation remains because the endpoint itself is still candidate-controlled
+### Public surface minimization
 
-### 2. Invite tokens were reusable in the pairing path
-Original severity: `P1`
+- Public invite validation uses a request body instead of query-string validation.
+- The public invite response is limited to the candidate-facing fields needed to start the session.
+- Reviewer notes, reviewer outcome, candidate email, and internal admin-only session details are not returned by the public route.
 
-Original issue:
-- Used invites could still be paired again.
-- Multiple clients could attach to the same session.
+### Transport and origin controls
 
-Remediation:
-- pairing now rejects used, revoked, expired, and non-`invited` sessions
-- successful pairing atomically claims the invite and moves the session into paired state
+- Non-localhost pairing requires HTTPS.
+- The scanner enforces an allowlist of approved LearningHub origins for non-local use.
+- The current test artifact was built with `HR_SCANNER_ALLOWED_ORIGINS=https://learninghub-nine.vercel.app`.
 
-Current status:
-- fixed
+### Electron hardening
 
-### 3. Public invite validation leaked internal HR data
-Original severity: `P1`
-
-Original issue:
-- Public validation returned the broader session model including internal HR-only fields.
-
-Remediation:
-- validation moved to `POST`
-- public DTO reduced to:
-  - candidate name
-  - job title
-  - scheduled time
-  - invite expiry
-  - session status
-
-Current status:
-- fixed
-
-### 4. Completed sessions remained mutable
-Original severity: `P2`
-
-Original issue:
-- repeated `completed` uploads could overwrite the final session summary and append duplicate completion events
-
-Remediation:
-- server rejects all scanner uploads after the first accepted completion
-- completion is now effectively one-way and immutable from the scanner path
-
-Current status:
-- fixed
-
-### 5. Token exposure through query-string validation
-Original severity: `P2`
-
-Original issue:
-- candidate token was sent again via GET query string during validation
-
-Remediation:
-- public validation route now accepts a POST body
-- page metadata now disables indexing and referrer leakage
-
-Current status:
-- fixed for the validation path
-- note: the invite token is still present in the candidate URL path by design
-
-### 6. Scanner accepted arbitrary origins and did not enforce HTTPS
-Original severity: `P2`
-
-Original issue:
-- manual pairing and pasted session links could target arbitrary hosts
-
-Remediation:
-- non-localhost pairing now requires HTTPS
-- scanner build enforces a trusted LearningHub origin allowlist via `HR_SCANNER_ALLOWED_ORIGINS`
-- manual fallback remains allowed only for trusted LearningHub origins
-
-Current status:
-- fixed
-
-### 7. Electron hardening gaps
-Original severity: `P3`
-
-Original issue:
-- renderer sandbox not enabled
-- no CSP
-- window navigation controls were weak
-
-Remediation:
-- `sandbox: true`
-- `webSecurity: true`
 - `contextIsolation: true`
 - `nodeIntegration: false`
-- new-window creation denied
-- CSP added to scanner HTML
+- `sandbox: true`
+- `webSecurity: true`
+- new-window creation is denied
+- a renderer Content Security Policy is present
 
-Current status:
-- fixed
+## Data Handling and Privacy Posture
 
-### 8. Unsigned Windows artifact
-Original severity: `P3`
+- Supabase persistence is limited to summary counts, flags, timestamps, review data, and event metadata required for HR workflow.
+- Raw suspicious process names, full command lines, and raw network-connection dumps remain local to the scanner and are not stored in platform persistence.
+- HR tables remain behind Row Level Security, and admin routes enforce authenticated admin access.
 
-Original issue:
-- test packaging path produced an unsigned artifact
+## Current Database Status
 
-Remediation:
-- default signed build path retained
-- separate unsigned test-build config introduced:
-  - `apps/hr-scanner/electron-builder.unsigned.json5`
+The hardening migration is applied in the target Supabase project.
 
-Current status:
-- partially addressed
-- unsigned build is acceptable for controlled testing only
-- formal release still requires Authenticode signing
+`public.hr_sessions` includes:
 
-## Database Hardening Applied
-
-Added to `public.hr_sessions`:
 - `scanner_public_key`
 - `scanner_key_fingerprint`
 - `scanner_last_sequence`
 
-Migration:
-- `supabase/migrations/20260324_hr_interview_integrity_hardening.sql`
+Verified migration history includes:
 
-Applied status:
-- applied successfully to the connected Supabase project
+- `20260323135243 hr_interview_integrity`
+- `20260323135500 hr_interview_integrity_indexes`
+- `20260323135618 hr_interview_integrity_policy_cleanup`
+- `20260324085923 hr_interview_integrity_hardening`
 
-## Validation Evidence
+## Validation Performed
 
-Executed successfully:
 - `pnpm test`
 - `pnpm scanner:typecheck`
-- targeted ESLint on HR/scanner source paths
-- hardened scanner unsigned build
-
-Artifact built:
-- `apps/hr-scanner/release/LearningHub HR Scanner 0.1.0.exe`
-- SHA-256: `DCCE1652FA9575C8E20554BFB1AA17C0357EFFFABBEA58B3ED042E78BED3F992`
-
-Trusted-origin build note:
-- scanner test artifact was built with `HR_SCANNER_ALLOWED_ORIGINS=https://learninghub-nine.vercel.app`
+- targeted ESLint on HR and scanner source paths
+- hardened Windows scanner build completed successfully
 
 ## Residual Risk
 
-### 1. Candidate device remains untrusted
-This solution does not provide hardware-backed attestation, TPM-backed runtime integrity, or remote attestation of the candidate endpoint. A sophisticated local user can still interfere with their own workstation and potentially bypass or suppress detection logic.
+- The scanner runs on a candidate-managed Windows machine. This is an untrusted endpoint by design.
+- Signed uploads and session binding materially improve integrity, but they do not provide hardware-backed remote attestation.
+- A determined local attacker with control of their own host should still be assumed capable of attempting endpoint tampering.
+- The currently generated Windows artifact is suitable for controlled testing and internal evaluation, but broad release should use a code-signed build and controlled release pipeline.
 
-### 2. Scanner is an integrity signal, not a forensic guarantee
-The control is suitable as a risk signal for HR review. It should not be positioned as cryptographic proof of candidate behavior.
+## Current Recommendation
 
-### 3. Production release signing is still required
-For formal distribution and endpoint trust review, the release artifact should be Authenticode-signed using a valid certificate and a build environment that supports the signing toolchain.
+Current posture for security review:
 
-## Recommendation
+- acceptable as a hardened HR review signal for interview integrity workflows
+- acceptable for controlled production use where HR reviewers interpret the signal as part of a broader hiring process
+- not appropriate to position as tamper-proof endpoint attestation or forensic-proof evidence collection
 
-Current recommendation:
-- internal testing / controlled rollout: acceptable
-- production use as a reviewed HR risk-signal control: acceptable with the residual-risk caveats above
-- production use as a high-assurance anti-cheat or forensic enforcement control: not recommended
+Release requirement for broad distribution:
 
-Required before broad formal release:
-- signed Windows artifact
-- documented operational policy for how HR interprets scanner findings
-- explicit acknowledgment from stakeholders that this is a hardened endpoint signal, not remote attestation
-
-## Reference Documents
-
-- `docs/HR_SCANNER_SECURITY_AUDIT_2026-03-24.md`
-- `docs/HR_SCANNER_SECURITY_REMEDIATION_2026-03-24.md`
+- produce a signed Windows artifact with a valid code-signing certificate
+- build and release from a controlled environment with the required signing privileges
