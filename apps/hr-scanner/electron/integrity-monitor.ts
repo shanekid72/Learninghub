@@ -1,6 +1,5 @@
 import { exec as rawExec } from "node:child_process"
 import { promisify } from "node:util"
-import psList from "ps-list"
 import si from "systeminformation"
 import { normalizeHrRiskSummary } from "../../../lib/hr/contracts"
 
@@ -32,24 +31,22 @@ async function getDisplayCount() {
   return graphics.displays?.length || 0
 }
 
-async function getInterviewCoderProcesses() {
-  const processes = await psList()
+function getInterviewCoderProcesses(processes: Awaited<ReturnType<typeof si.processes>>["list"]) {
   return processes
     .filter((process) => {
       const name = process.name || ""
-      const command = process.cmd || ""
+      const command = process.command || ""
       return INTERVIEW_CODER_PATTERN.test(name) || INTERVIEW_CODER_PATTERN.test(command)
     })
     .map((process) => ({
       pid: process.pid,
       name: process.name || "unknown",
-      command: process.cmd || "",
+      command: process.command || "",
     }))
 }
 
-async function getHighMemoryProcesses() {
-  const processData = await si.processes()
-  return processData.list
+function getHighMemoryProcesses(processes: Awaited<ReturnType<typeof si.processes>>["list"]) {
+  return processes
     .filter((process) => Math.round(process.memRss / 1024) > MEMORY_THRESHOLD_MB)
     .map((process) => ({
       pid: process.pid,
@@ -90,13 +87,14 @@ export class IntegrityMonitor {
 
   async runSnapshot(): Promise<ScannerSnapshot> {
     const timestamp = new Date().toISOString()
-    const [displayCount, interviewCoderProcesses, highMemoryProcesses, networkConnectionCounts] =
+    const [displayCount, processData, networkConnectionCounts] =
       await Promise.all([
         getDisplayCount(),
-        getInterviewCoderProcesses(),
-        getHighMemoryProcesses(),
+        si.processes(),
         getNetworkConnectionCounts(),
       ])
+    const interviewCoderProcesses = getInterviewCoderProcesses(processData.list)
+    const highMemoryProcesses = getHighMemoryProcesses(processData.list)
 
     const suspiciousProcesses = highMemoryProcesses
       .filter((process) => networkConnectionCounts.has(process.pid))
