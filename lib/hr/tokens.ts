@@ -47,9 +47,9 @@ async function hashValue(value: string): Promise<string> {
 }
 
 function getHrUploadTokenSecret(): string {
-  const secret = process.env.HR_UPLOAD_TOKEN_SECRET || process.env.AUTH_COOKIE_SECRET
+  const secret = process.env.HR_UPLOAD_TOKEN_SECRET
   if (!secret) {
-    throw new Error("HR_UPLOAD_TOKEN_SECRET or AUTH_COOKIE_SECRET must be configured")
+    throw new Error("HR_UPLOAD_TOKEN_SECRET must be configured")
   }
   return secret
 }

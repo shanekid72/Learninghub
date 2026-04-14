@@ -3,7 +3,7 @@ import { getSessionContext } from "@/lib/app-session"
 import { createAdminClient } from "@/lib/supabase/server"
 import { z } from "zod"
 import { Comment } from "@/lib/comment-types"
-import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
+import { checkRateLimit, getRateLimitResponse } from "@/lib/rate-limit"
 import { sanitizeCommentContent } from "@/lib/sanitize"
 
 const createCommentSchema = z.object({
@@ -74,15 +74,18 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const clientIP = getClientIP(request)
-    const rateLimitResult = checkRateLimit(clientIP, '/api/comments')
-    
+    const session = await getSessionContext()
+    if (!session?.profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rateLimitResult = checkRateLimit(session.profile.id, '/api/comments')
     if (!rateLimitResult.success) {
       return getRateLimitResponse(rateLimitResult.resetIn)
     }
 
     const body = await request.json()
-    
+
     const validation = createCommentSchema.safeParse(body)
     if (!validation.success) {
       return NextResponse.json(
@@ -93,17 +96,12 @@ export async function POST(request: Request) {
 
     const { moduleId, parentId } = validation.data
     const sanitizedContent = sanitizeCommentContent(validation.data.content)
-    
+
     if (!sanitizedContent) {
       return NextResponse.json(
         { error: 'Comment content is empty after sanitization' },
         { status: 400 }
       )
-    }
-
-    const session = await getSessionContext()
-    if (!session?.profile) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const supabase = await createAdminClient()

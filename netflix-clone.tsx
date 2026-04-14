@@ -34,7 +34,7 @@ import { type Module } from "@/lib/module-types"
 import { useLearningHubModules, type LHModule } from "@/hooks/useLearningHubModules"
 import { useLearningHubCompletions } from "@/hooks/useLearningHubCompletions"
 import { useAuthEmail } from "@/hooks/useAuthEmail"
-import { trackModuleComplete, trackSearch } from "@/lib/analytics"
+import { trackSearch } from "@/lib/analytics"
 
 /** Map an API module to the internal Module shape */
 function mapToModule(lh: LHModule): Module {
@@ -163,7 +163,6 @@ export default function LearningHub() {
 
       // pull fresh completions so My Learning stays correct after reload
       await refreshCompletions()
-      await trackModuleComplete(String(id))
     } catch (e) {
       console.error(e)
     }

@@ -1,4 +1,8 @@
+import { NextResponse } from "next/server"
+
 const rateLimit = new Map<string, { count: number; lastReset: number }>()
+const RATE_LIMIT_COOKIE_NAME = "lh_rlid"
+const RATE_LIMIT_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24
 
 interface RateLimitConfig {
   limit: number
@@ -51,27 +55,38 @@ export function checkRateLimit(
 }
 
 export function getRateLimitResponse(resetIn: number) {
-  return new Response(
-    JSON.stringify({ 
-      error: 'Too many requests', 
-      retryAfter: Math.ceil(resetIn / 1000) 
-    }),
+  return NextResponse.json(
+    {
+      error: "Too many requests",
+      retryAfter: Math.ceil(resetIn / 1000),
+    },
     {
       status: 429,
       headers: {
-        'Content-Type': 'application/json',
-        'Retry-After': String(Math.ceil(resetIn / 1000)),
+        "Retry-After": String(Math.ceil(resetIn / 1000)),
       },
-    }
+    },
   )
 }
 
-export function getClientIP(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) {
-    return forwarded.split(',')[0].trim()
-  }
-  return request.headers.get('x-real-ip') || 'unknown'
+export function getRateLimitCookieName() {
+  return RATE_LIMIT_COOKIE_NAME
+}
+
+export function createRateLimitCookieValue() {
+  return crypto.randomUUID()
+}
+
+export function attachRateLimitCookie(response: NextResponse, value: string) {
+  response.cookies.set(RATE_LIMIT_COOKIE_NAME, value, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: RATE_LIMIT_COOKIE_MAX_AGE_SECONDS,
+  })
+
+  return response
 }
 
 const cleanupTimer = setInterval(() => {

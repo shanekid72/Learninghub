@@ -4,15 +4,9 @@ import { createAdminClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
-function normalizeEmail(value: unknown): string | null {
-  if (typeof value !== "string") return null
-  const clean = value.trim().toLowerCase()
-  return clean && clean.includes("@") ? clean : null
-}
-
 export async function GET() {
   const session = await getSessionContext()
-  if (!session) {
+  if (!session?.profile) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
   }
 
@@ -20,10 +14,10 @@ export async function GET() {
     const supabase = await createAdminClient()
     const { data, error } = await supabase
       .from("analytics_events")
-      .select("module_id, created_at, metadata, user_id")
+      .select("module_id, created_at, metadata")
       .eq("event_type", "module_complete")
+      .eq("user_id", session.profile.id)
       .order("created_at", { ascending: false })
-      .limit(5000)
 
     if (error) throw error
 
@@ -41,12 +35,6 @@ export async function GET() {
         row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
           ? (row.metadata as Record<string, unknown>)
           : null
-
-      const eventEmail = normalizeEmail(metadata?.email)
-      const matchesProfile = Boolean(session.profile?.id && row.user_id === session.profile.id)
-      const matchesEmail = eventEmail === session.email
-
-      if (!matchesProfile && !matchesEmail) continue
 
       const existing = latestByModule.get(moduleId)
       if (existing && existing.completed_at >= completedAt) continue

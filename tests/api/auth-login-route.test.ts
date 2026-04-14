@@ -1,128 +1,132 @@
+import { NextRequest } from "next/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
-  getRateLimitResponse: vi.fn(),
   checkRateLimit: vi.fn(),
-  getClientIP: vi.fn(),
-  isValidEmail: vi.fn(),
-  createSignedSession: vi.fn(),
-  getAuthCookieName: vi.fn(),
-  getSessionTtlHours: vi.fn(),
+  createClient: vi.fn(),
+  createRateLimitCookieValue: vi.fn(),
+  getRateLimitResponse: vi.fn(),
 }))
 
 vi.mock("@/lib/rate-limit", () => ({
-  getRateLimitResponse: mocks.getRateLimitResponse,
+  attachRateLimitCookie: (response: Response, value: string) => {
+    response.headers.append("set-cookie", `lh_rlid=${value}; Path=/; HttpOnly; SameSite=Lax`)
+    return response
+  },
   checkRateLimit: mocks.checkRateLimit,
-  getClientIP: mocks.getClientIP,
+  createRateLimitCookieValue: mocks.createRateLimitCookieValue,
+  getRateLimitCookieName: () => "lh_rlid",
+  getRateLimitResponse: mocks.getRateLimitResponse,
 }))
 
-vi.mock("@/lib/sanitize", () => ({
-  isValidEmail: mocks.isValidEmail,
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: mocks.createClient,
 }))
 
-vi.mock("@/lib/auth-session", () => ({
-  createSignedSession: mocks.createSignedSession,
-  getAuthCookieName: mocks.getAuthCookieName,
-  getSessionTtlHours: mocks.getSessionTtlHours,
-}))
+import { GET, POST } from "@/app/api/auth/login/route"
 
-import { POST } from "@/app/api/auth/login/route"
-
-describe("POST /api/auth/login", () => {
+describe("auth login route", () => {
   beforeEach(() => {
-    mocks.getClientIP.mockReturnValue("127.0.0.1")
     mocks.checkRateLimit.mockReturnValue({
       success: true,
       remaining: 4,
       resetIn: 60_000,
     })
-    mocks.isValidEmail.mockReturnValue(true)
-    mocks.createSignedSession.mockResolvedValue("signed-token")
-    mocks.getAuthCookieName.mockReturnValue("lh_session")
-    mocks.getSessionTtlHours.mockReturnValue(24)
+    mocks.createRateLimitCookieValue.mockReturnValue("rate-limit-id")
     mocks.getRateLimitResponse.mockImplementation(
-      () => new Response(JSON.stringify({ error: "Too many requests" }), { status: 429 }),
+      (resetIn: number) =>
+        new Response(
+          JSON.stringify({
+            error: "Too many requests",
+            retryAfter: Math.ceil(resetIn / 1000),
+          }),
+          {
+            status: 429,
+            headers: { "Retry-After": String(Math.ceil(resetIn / 1000)) },
+          },
+        ),
     )
-    delete process.env.AUTH_ALLOWED_EMAIL_DOMAINS
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        signInWithOAuth: vi.fn().mockResolvedValue({
+          data: { url: "https://accounts.google.com/o/oauth2/v2/auth" },
+          error: null,
+        }),
+      },
+    })
+    process.env.AUTH_ALLOWED_EMAIL_DOMAINS = "example.com"
+    delete process.env.APP_BASE_URL
+    delete process.env.NEXT_PUBLIC_APP_URL
   })
 
-  it("returns 429 when rate limit fails", async () => {
+  it("returns 410 for the retired email POST login endpoint", async () => {
+    const response = await POST()
+
+    expect(response.status).toBe(410)
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "email_login_removed",
+    })
+  })
+
+  it("returns 429 when the login initiation rate limit is exceeded", async () => {
     mocks.checkRateLimit.mockReturnValue({
       success: false,
       remaining: 0,
       resetIn: 3_000,
     })
 
-    const res = await POST(
-      new Request("http://localhost/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: "user@example.com" }),
-      }),
-    )
-    expect(res.status).toBe(429)
+    const response = await GET(new NextRequest("http://localhost/api/auth/login"))
+
+    expect(response.status).toBe(429)
     expect(mocks.getRateLimitResponse).toHaveBeenCalledWith(3_000)
+    expect(response.headers.get("set-cookie")).toContain("lh_rlid=rate-limit-id")
   })
 
-  it("returns 400 for malformed JSON payload", async () => {
-    const res = await POST(
-      new Request("http://localhost/api/auth/login", {
-        method: "POST",
-        body: "{bad-json}",
-        headers: { "content-type": "application/json" },
+  it("fails closed when allowed auth domains are not configured", async () => {
+    process.env.AUTH_ALLOWED_EMAIL_DOMAINS = ""
+
+    const response = await GET(new NextRequest("http://localhost/api/auth/login"))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get("location")).toBe("http://localhost/?error=auth_domain_not_configured")
+    expect(response.headers.get("set-cookie")).toContain("lh_rlid=rate-limit-id")
+  })
+
+  it("starts Google OAuth using the existing server-issued rate-limit cookie", async () => {
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: { url: "https://accounts.google.com/o/oauth2/v2/auth?client_id=test" },
+      error: null,
+    })
+    mocks.createClient.mockResolvedValue({
+      auth: {
+        signInWithOAuth,
+      },
+    })
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/auth/login", {
+        headers: {
+          cookie: "lh_rlid=existing-rlid",
+        },
       }),
     )
 
-    expect(res.status).toBe(400)
-    await expect(res.json()).resolves.toMatchObject({ ok: false, error: "invalid_payload" })
-  })
-
-  it("returns 400 for invalid email", async () => {
-    mocks.isValidEmail.mockReturnValue(false)
-
-    const res = await POST(
-      new Request("http://localhost/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: "bad-email" }),
-      }),
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith("existing-rlid", "/api/auth/login")
+    expect(signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "http://localhost/auth/callback",
+        queryParams: {
+          hd: "example.com",
+          prompt: "select_account",
+        },
+      },
+    })
+    expect(response.status).toBe(307)
+    expect(response.headers.get("location")).toBe(
+      "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
     )
-
-    expect(res.status).toBe(400)
-    await expect(res.json()).resolves.toMatchObject({ ok: false, error: "invalid_email" })
-  })
-
-  it("returns 403 for disallowed domain", async () => {
-    process.env.AUTH_ALLOWED_EMAIL_DOMAINS = "allowed.com"
-
-    const res = await POST(
-      new Request("http://localhost/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: "user@other.com" }),
-      }),
-    )
-
-    expect(res.status).toBe(403)
-    await expect(res.json()).resolves.toMatchObject({ ok: false, error: "domain_not_allowed" })
-  })
-
-  it("sets signed auth cookie and returns expiry metadata on success", async () => {
-    process.env.AUTH_ALLOWED_EMAIL_DOMAINS = "example.com"
-
-    const res = await POST(
-      new Request("http://localhost/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: "User@Example.com " }),
-      }),
-    )
-
-    expect(res.status).toBe(200)
-    expect(mocks.createSignedSession).toHaveBeenCalledWith("user@example.com")
-
-    const body = (await res.json()) as { ok: boolean; email: string; expiresAt: string }
-    expect(body.ok).toBe(true)
-    expect(body.email).toBe("user@example.com")
-    expect(body.expiresAt).toBeTypeOf("string")
-
-    const setCookie = res.headers.get("set-cookie")
-    expect(setCookie).toContain("lh_session=signed-token")
+    expect(response.headers.get("set-cookie")).toBeNull()
   })
 })

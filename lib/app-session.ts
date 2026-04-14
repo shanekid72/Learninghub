@@ -1,5 +1,5 @@
-import { cookies } from "next/headers"
-import { getAuthCookieName, readEmailFromSession } from "@/lib/auth-session"
+import { normalizeEmail } from "@/lib/auth-config"
+import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/server"
 
 export type SessionUserProfile = {
@@ -20,40 +20,88 @@ export function hasAdminRole(profile: SessionUserProfile | null | undefined): bo
 }
 
 export async function getSessionContext(): Promise<SessionContext | null> {
-  const cookieStore = await cookies()
-  const sessionEmail = await readEmailFromSession(
-    cookieStore.get(getAuthCookieName())?.value,
-  )
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
 
-  if (!sessionEmail) {
+  if (userError) {
+    throw userError
+  }
+
+  if (!user) {
     return null
   }
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { email: sessionEmail, profile: null }
+  const normalizedUserEmail = normalizeEmail(user.email)
+  if (!normalizedUserEmail) {
+    return null
   }
 
-  const supabase = await createAdminClient()
-  const { data: profile, error } = await supabase
+  const { data: ownProfile, error: ownProfileError } = await supabase
     .from("profiles")
     .select("id, email, role, full_name, team")
-    .eq("email", sessionEmail)
+    .eq("id", user.id)
     .maybeSingle()
 
-  if (error) {
-    throw error
+  if (ownProfileError && ownProfileError.code !== "PGRST116") {
+    throw ownProfileError
+  }
+
+  if (ownProfile) {
+    return {
+      email: normalizeEmail(ownProfile.email) || normalizedUserEmail,
+      profile: {
+        id: ownProfile.id,
+        email: ownProfile.email,
+        role: ownProfile.role || "learner",
+        fullName: ownProfile.full_name,
+        team: ownProfile.team,
+      },
+    }
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      email: normalizedUserEmail,
+      profile: {
+        id: user.id,
+        email: normalizedUserEmail,
+        role: "learner",
+        fullName: null,
+        team: null,
+      },
+    }
+  }
+
+  const adminClient = await createAdminClient()
+  const { data: adminProfile, error: adminProfileError } = await adminClient
+    .from("profiles")
+    .select("id, email, role, full_name, team")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (adminProfileError && adminProfileError.code !== "PGRST116") {
+    throw adminProfileError
   }
 
   return {
-    email: sessionEmail,
-    profile: profile
+    email: normalizeEmail(adminProfile?.email) || normalizedUserEmail,
+    profile: adminProfile
       ? {
-          id: profile.id,
-          email: profile.email,
-          role: profile.role || "learner",
-          fullName: profile.full_name,
-          team: profile.team,
+          id: adminProfile.id,
+          email: adminProfile.email,
+          role: adminProfile.role || "learner",
+          fullName: adminProfile.full_name,
+          team: adminProfile.team,
         }
-      : null,
+      : {
+          id: user.id,
+          email: normalizedUserEmail,
+          role: "learner",
+          fullName: null,
+          team: null,
+        },
   }
 }

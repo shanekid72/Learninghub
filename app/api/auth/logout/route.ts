@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server";
-import { getAuthCookieName } from "@/lib/auth-session";
+import { NextResponse } from "next/server"
+import { clearLegacyAuthCookie } from "@/lib/auth-config"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST() {
-  const cookieName = getAuthCookieName();
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(cookieName, "", { httpOnly: true, path: "/", maxAge: 0, sameSite: "lax" });
-  return res;
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+
+  const response = NextResponse.json({ ok: true })
+  clearLegacyAuthCookie(response)
+  return response
 }

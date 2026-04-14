@@ -3,7 +3,7 @@ import { getSessionContext, hasAdminRole } from "@/lib/app-session"
 import { createAdminClient } from "@/lib/supabase/server"
 import { sendEmail, EmailType } from "@/lib/email"
 import { z } from "zod"
-import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
+import { checkRateLimit, getRateLimitResponse } from "@/lib/rate-limit"
 
 const sendNotificationSchema = z.object({
   type: z.enum(['welcome', 'completion', 'reminder', 'certificate', 'update']),
@@ -21,26 +21,24 @@ const notificationPreferenceByType = {
 
 export async function POST(request: Request) {
   try {
-    const clientIP = getClientIP(request)
-    const rateLimitResult = checkRateLimit(clientIP, '/api/notifications/send')
-    
+    const session = await getSessionContext()
+    if (!session?.profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rateLimitResult = checkRateLimit(session.profile.id, '/api/notifications/send')
     if (!rateLimitResult.success) {
       return getRateLimitResponse(rateLimitResult.resetIn)
     }
 
     const body = await request.json()
-    
+
     const validation = sendNotificationSchema.safeParse(body)
     if (!validation.success) {
       return NextResponse.json(
         { error: 'Invalid request data', details: validation.error.issues },
         { status: 400 }
       )
-    }
-
-    const session = await getSessionContext()
-    if (!session?.profile) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { type, userId, email, data } = validation.data

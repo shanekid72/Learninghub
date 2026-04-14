@@ -23,7 +23,7 @@ import { CommentSection } from "./comments"
 import { CertificateDownload } from "./certificate/certificate-download"
 import type { Module } from "@/lib/module-types"
 import type { Quiz, QuizResult } from "@/lib/quiz-types"
-import { trackModuleView, trackQuizComplete, trackQuizStart } from "@/lib/analytics"
+import { trackModuleView, trackQuizStart } from "@/lib/analytics"
 import type { ModuleQuizMode } from "@/lib/module-types"
 
 type TabType = "content" | "quiz" | "comments"
@@ -97,11 +97,6 @@ export function ModuleDetailModal({
   }
 
   const handleQuizComplete = (result: QuizResult) => {
-    if (module) {
-      const quizId = supabaseQuiz?.id || String(module.id)
-      void trackQuizComplete(String(module.id), quizId, result.score, result.passed)
-    }
-
     if (result.passed) {
       setQuizPassed(true)
     }

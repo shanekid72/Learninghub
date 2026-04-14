@@ -24,7 +24,7 @@ export default defineConfig({
   ],
   webServer: startLocalServer
     ? {
-        command: "pnpm dev --port 3000",
+        command: "corepack.cmd pnpm dev --port 3000",
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

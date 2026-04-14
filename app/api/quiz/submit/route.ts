@@ -3,9 +3,10 @@ import { getSessionContext } from "@/lib/app-session"
 import { createAdminClient } from "@/lib/supabase/server"
 import { QuizSubmission, StoredQuizQuestion } from "@/lib/quiz-types"
 import { z } from "zod"
-import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
+import { checkRateLimit, getRateLimitResponse } from "@/lib/rate-limit"
 import { scoreQuizSubmission } from "@/lib/quiz-scoring"
 import { selectQuizQuestionsForLearner } from "@/lib/quiz-rotation"
+import { recordAnalyticsEvent } from "@/lib/server-analytics"
 
 const submissionSchema = z.object({
   quizId: z.string().uuid(),
@@ -15,26 +16,24 @@ const submissionSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const clientIP = getClientIP(request)
-    const rateLimitResult = checkRateLimit(clientIP, '/api/quiz/submit')
-    
+    const session = await getSessionContext()
+    if (!session?.profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rateLimitResult = checkRateLimit(session.profile.id, '/api/quiz/submit')
     if (!rateLimitResult.success) {
       return getRateLimitResponse(rateLimitResult.resetIn)
     }
 
     const body = await request.json()
-    
+
     const validation = submissionSchema.safeParse(body)
     if (!validation.success) {
       return NextResponse.json(
         { error: 'Invalid submission data', details: validation.error.issues },
         { status: 400 }
       )
-    }
-
-    const session = await getSessionContext()
-    if (!session?.profile) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const submission: QuizSubmission = validation.data
@@ -85,6 +84,20 @@ export async function POST(request: Request) {
     if (attemptError) {
       console.error('Failed to save quiz attempt:', attemptError)
     }
+
+    await recordAnalyticsEvent(
+      {
+        userId: session.profile.id,
+        type: 'quiz_complete',
+        moduleId: quiz.module_id,
+        metadata: {
+          quizId: quiz.id,
+          score: result.score,
+          passed: result.passed,
+        },
+      },
+      supabase,
+    )
 
     return NextResponse.json(result)
   } catch (error) {

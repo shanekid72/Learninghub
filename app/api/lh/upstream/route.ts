@@ -75,12 +75,33 @@ async function handleCompletions(url: URL) {
   }
 
   const supabase = await createAdminClient()
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle()
+
+  if (profileError) {
+    console.error("Fallback completions profile lookup failed:", profileError)
+    return NextResponse.json(
+      { ok: false, error: "db_query_failed" },
+      { status: 500 },
+    )
+  }
+
+  if (!profile) {
+    return NextResponse.json({
+      ok: true,
+      completions: [],
+    })
+  }
+
   const { data, error } = await supabase
     .from("analytics_events")
     .select("module_id, created_at, metadata")
     .eq("event_type", "module_complete")
+    .eq("user_id", profile.id)
     .order("created_at", { ascending: false })
-    .limit(5000)
 
   if (error) {
     console.error("Fallback completions query failed:", error)
@@ -105,14 +126,11 @@ async function handleCompletions(url: URL) {
         ? (row.metadata as Record<string, unknown>)
         : null
 
-    const rowEmail = normalizeEmail(metadata?.email)
-    if (!rowEmail || rowEmail !== email) continue
-
     const existing = latestByModule.get(moduleId)
     if (existing && existing.completed_at >= completedAt) continue
 
     latestByModule.set(moduleId, {
-      email: rowEmail,
+      email,
       module_id: moduleId,
       completed_at: completedAt,
       source: typeof metadata?.source === "string" ? metadata.source : "portal",

@@ -3,41 +3,34 @@ import { getSessionContext } from "@/lib/app-session"
 import { createAdminClient } from "@/lib/supabase/server"
 import { z } from "zod"
 import { CertificateData } from "@/lib/certificate-types"
-import { checkRateLimit, getRateLimitResponse, getClientIP } from "@/lib/rate-limit"
+import { checkRateLimit, getRateLimitResponse } from "@/lib/rate-limit"
+import { recordAnalyticsEvent } from "@/lib/server-analytics"
 
 const generateSchema = z.object({
   moduleId: z.string(),
   moduleTitle: z.string()
 })
 
-function normalizeEmail(value: unknown): string | null {
-  if (typeof value !== "string") return null
-  const clean = value.trim().toLowerCase()
-  return clean && clean.includes("@") ? clean : null
-}
-
 export async function POST(request: Request) {
   try {
-    const clientIP = getClientIP(request)
-    const rateLimitResult = checkRateLimit(clientIP, '/api/certificates/generate')
-    
+    const session = await getSessionContext()
+    if (!session?.profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rateLimitResult = checkRateLimit(session.profile.id, '/api/certificates/generate')
     if (!rateLimitResult.success) {
       return getRateLimitResponse(rateLimitResult.resetIn)
     }
 
     const body = await request.json()
-    
+
     const validation = generateSchema.safeParse(body)
     if (!validation.success) {
       return NextResponse.json(
         { error: 'Invalid request data', details: validation.error.issues },
         { status: 400 }
       )
-    }
-
-    const session = await getSessionContext()
-    if (!session?.profile) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { moduleId, moduleTitle } = validation.data
@@ -66,27 +59,20 @@ export async function POST(request: Request) {
       )
     }
 
-    const { data: completionEvents, error: completionError } = await supabase
+    const { data: completionEvent, error: completionError } = await supabase
       .from("analytics_events")
-      .select("user_id, metadata")
+      .select("id")
       .eq("event_type", "module_complete")
       .eq("module_id", moduleId)
+      .eq("user_id", session.profile.id)
+      .limit(1)
+      .maybeSingle()
 
-    if (completionError) {
+    if (completionError && completionError.code !== "PGRST116") {
       throw completionError
     }
 
-    const hasCompletion = (completionEvents || []).some((row) => {
-      const metadata =
-        row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
-          ? (row.metadata as Record<string, unknown>)
-          : null
-
-      return (
-        (session.profile?.id && row.user_id === session.profile.id) ||
-        normalizeEmail(metadata?.email) === session.email
-      )
-    })
+    const hasCompletion = Boolean(completionEvent)
 
     if (!hasCompletion) {
       return NextResponse.json(
@@ -149,6 +135,20 @@ export async function POST(request: Request) {
         }),
         issuedAt
       }
+
+      await recordAnalyticsEvent(
+        {
+          userId: session.profile.id,
+          type: "certificate_generated",
+          moduleId,
+          metadata: {
+            certificateId: existingCert.id,
+            reusedExisting: true,
+          },
+        },
+        supabase,
+      )
+
       return NextResponse.json(certificateData)
     }
 
@@ -177,6 +177,19 @@ export async function POST(request: Request) {
       }),
       issuedAt
     }
+
+    await recordAnalyticsEvent(
+      {
+        userId: session.profile.id,
+        type: "certificate_generated",
+        moduleId,
+        metadata: {
+          certificateId: newCert.id,
+          reusedExisting: false,
+        },
+      },
+      supabase,
+    )
 
     return NextResponse.json(certificateData)
   } catch (error) {

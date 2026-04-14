@@ -20,9 +20,6 @@ interface EnvConfig {
   LH_BASE_URL?: string
   LH_API_KEY?: string
   AUTH_ALLOWED_EMAIL_DOMAINS?: string
-  AUTH_COOKIE_NAME: string
-  AUTH_COOKIE_SECRET?: string
-  AUTH_SESSION_TTL_HOURS: string
 }
 
 function getEnvVar(key: string, required: boolean = false): string {
@@ -58,9 +55,6 @@ export function validateEnv(): EnvConfig {
     LH_BASE_URL: getEnvVar('LH_BASE_URL'),
     LH_API_KEY: getEnvVar('LH_API_KEY'),
     AUTH_ALLOWED_EMAIL_DOMAINS: getEnvVar('AUTH_ALLOWED_EMAIL_DOMAINS'),
-    AUTH_COOKIE_NAME: getEnvVar('AUTH_COOKIE_NAME') || 'lh_session',
-    AUTH_COOKIE_SECRET: getEnvVar('AUTH_COOKIE_SECRET'),
-    AUTH_SESSION_TTL_HOURS: getEnvVar('AUTH_SESSION_TTL_HOURS') || '24',
   }
 }
 

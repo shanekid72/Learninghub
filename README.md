@@ -3,7 +3,7 @@
 LearningHub is an internal learning portal built with Next.js (App Router), Supabase, and Tailwind.
 It provides:
 
-- Email-gated authentication
+- Google SSO authentication via Supabase Auth
 - Learning module browsing and completion tracking
 - Comments and quiz attempts
 - Certificate generation/download
@@ -109,7 +109,7 @@ pnpm test:e2e
 - Build fails with missing env:
   - Verify required variables in `.env.local`
 - Supabase auth/API routes returning unauthorized:
-  - Confirm `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and session cookie secret values
+  - Confirm `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `AUTH_ALLOWED_EMAIL_DOMAINS`
 - Empty module/catalog data:
   - Check `SUPABASE_SERVICE_ROLE_KEY` and seeded `learning_modules` rows
 - Email sending fails:

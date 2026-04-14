@@ -8,8 +8,7 @@ import {
 
 describe("hr tokens", () => {
   beforeEach(() => {
-    process.env.AUTH_COOKIE_SECRET = "super-secret-test-key"
-    delete process.env.HR_UPLOAD_TOKEN_SECRET
+    process.env.HR_UPLOAD_TOKEN_SECRET = "super-secret-test-key"
     process.env.HR_UPLOAD_TOKEN_TTL_MINUTES = "60"
   })
 
